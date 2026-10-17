@@ -1,0 +1,15 @@
+# Budget: artifacts/path-budget.md, .gitignore <= 1,024 bytes.
+# The production dist/ export is intentionally included.
+**/node_modules/
+**/.npm/
+**/.cache/
+**/.vite/
+**/.pnpm-store/
+**/.yarn/cache/
+**/.yarn/unplugged/
+**/coverage/
+**/test-results/
+**/playwright-report/
+*.tsbuildinfo
+/test/scratch/
+/.playwright-mcp/
