@@ -1,12 +1,12 @@
 # ERC20T
 
-A static Ethereum mainnet frontend for creating tokens with a shared Uniswap v4 tax hook. The submission includes the production export in **`dist/`**, React/TypeScript source, full verified contract ABIs, and a dependency lockfile.
+A token launch console for **Ethereum and Robinhood Chain**, using a shared Uniswap v4 tax hook. Choose an approximate starting market cap; the app calculates the base-token starting price. The delivery contains React/TypeScript source, the existing dependency lockfile, and the complete static export in **`dist/`**.
 
-[Mobile screenshot](artifacts/launch-mobile.webp) · [Desktop screenshot](artifacts/launch-desktop.webp) · [Design system](DESIGN.md) · [Validation report](artifacts/validation.md) · [Contract research](artifacts/contract-research.md)
+[Ethereum mobile](artifacts/launch-mobile.png) · [Robinhood mobile](artifacts/robinhood-mobile.png) · [Market-cap controls](artifacts/marketcap-mobile.png) · [Desktop](artifacts/launch-desktop.png) · [Design system](DESIGN.md) · [Validation](artifacts/validation.md) · [Contract research](artifacts/contract-research.md)
 
-## Install, preview, and rebuild
+## Install, preview and rebuild
 
-Use Node.js **22.12 or later** and npm. No environment file, private key, API key, backend, or WalletConnect project ID is needed.
+Use Node.js **22.12 or later** and npm. No environment file, private key, API key, backend or WalletConnect project ID is required.
 
 ```sh
 npm ci
@@ -15,88 +15,107 @@ npm run build
 npm run preview
 ```
 
-Open the local URL printed by Vite. For development, use `npm run dev`. To preview the delivered export without installing dependencies, serve `dist/` with any static HTTP server, for example:
+Open Vite's printed local URL. Development uses `npm run dev`. To serve the delivered export without installing build dependencies:
 
 ```sh
 python3 -m http.server 4173 --directory dist
 ```
 
-The host serves the contents of `dist/`. Vite uses `base: './'`; scripts, CSS, fonts, icons, favicon, and the share image resolve relative to the export. Hash routing works at a gateway subpath without server-side rewrites. Opening `index.html` using `file://` is not a supported ESM preview method. No publication command is needed or included.
+Serve the contents of `dist/`. The existing Vite configuration uses `base: './'`; all required runtime assets are local and resolve relative to the export. Hash routes work at gateway subpaths without server rewrites. Use an HTTP server to preview ESM modules.
 
-The optional `scripts/staged-build.sh` copies source to an external build directory, runs the typecheck/build there, and copies the finished export back. Install this project's lockfile in that directory first. The script defaults to `/tmp/erc20t-build`; `ERC20T_BUILD_DIR` can override it. This was used for the assignment to keep all dependency directories outside the repository.
+For an isolated build that keeps dependencies outside the repository:
 
-## What works
+```sh
+mkdir -p /tmp/erc20t-build
+cp package.json package-lock.json /tmp/erc20t-build/
+npm --prefix /tmp/erc20t-build ci --cache /tmp/erc20t-npm-cache
+bash scripts/staged-build.sh
+```
 
-- **Create:** name, symbol, fixed supply; deploy and launch in one transaction or deploy first; ETH, IMD, FWA, and a checked custom eligible base; starting price; 0–20% creator allocation; 0.3–5% resting tax; optional 99% launch decay; separate recipient settings; onchain price preview; explicit final review.
-- **Explore:** paginated factory deployments, search, base/status filters, refresh, and direct token-address lookup. Tokens and tax rates are read from Ethereum; no demonstration tokens or invented market statistics are shipped.
-- **Manage:** filter loaded deployments to the connected owner, launch a deployed token later, change regular/decay recipients, resting tax, local/global distributor permissions, external liquidity, and pairing permission.
-- **Wallets:** named EIP-6963 browser wallets, a browser fallback, Coinbase Wallet/Smart Wallet, and four mobile in-app links. Wrong-chain switching, disconnect, and rejection messages are implemented.
-- **Transactions:** mainnet simulation before signing, fresh ownership/eligibility checks, zero base deposit, duplicate-request protection, pending/confirmed/reverted states, cancellation recovery, receipt rechecks, and Etherscan links. Only the visitor's wallet can sign.
+That unchanged script copies current source/assets into `/tmp/erc20t-build`, runs typecheck and production build, then replaces `dist/` with the result. `ERC20T_BUILD_DIR` optionally selects another external build directory. Retain the complete export when delivering an update. Hosting/publication is outside this repository workflow.
 
-The default recipient is the actually connected wallet, not an embedded owner address. A custom recipient must be entered by the visitor. Native ETH's zero-address currency sentinel is the verified contract convention and is never used as a recipient.
+## Networks and launch pricing
 
-## Routes and source
+The header selector is available on phones and desktop. Ethereum is the default; the Robinhood version is `?network=robinhood#/create`. For a subpath, use `/subpath/?network=robinhood#/create`. Chain selection reloads the app, clearing unsigned drafts, query caches and review approvals. A token-detail route changes to Explore when selecting another chain. Wallets switch to the selected network before signing.
 
-| Route / source | Purpose |
+`src/networks.ts` contains the supplied factory, hook, implementation and registry addresses. New Ethereum tokens use hook `0x05e1934d8B52a8dED4F3F42AA9a7a12244192544`; existing tokens using the previous hook remain readable and manageable with their own hook. Robinhood uses chain **4663** and its distinct contracts. Ethereum offers ETH, IMD and FWA. Robinhood offers ETH and its independently verified, registered IMD token. A Robinhood FWA address was not supplied or verified, so it is not guessed; other eligible bases can be entered by address.
+
+Both atomic launches and deferred owner launches offer **~$50k / $150k / $500k / $1m**, defaulting to ~$150k. The target is fully diluted valuation: **total supply, including the creator allocation**, rather than only the liquidity reserve. The app performs the calculation locally with BigInt before calling the existing contract preview and launch methods:
+
+```text
+token USD price = target market cap / whole-token total supply
+base per token = token USD price / base USD price
+atomic starting price = ceil(targetUSD × 10^(36 + baseDecimals)
+                            / (supplyAtomic18 × baseUSD18))
+```
+
+For example, a $150,000 target with one billion tokens and ETH at $2,500 gives **0.00000006 ETH per token**. The factory then aligns that price to a pool tick; review displays the effective price and approximate resulting valuation. This does not raise the selected amount of money or guarantee later trading value. No base-token deposit is required; network gas still applies.
+
+ETH/USD comes from CoinGecko with its update timestamp. IMD/FWA and other ERC20 quotes come from DexScreener: the exact base-token address and selected chain must match, and the positive-liquidity quoted pair with the greatest USD liquidity is chosen. Each quote shows its source and time. DexScreener's time is the response fetch time, **not a verified last-trade timestamp**. Quotes refresh every minute while editing; reviewed prices stay fixed. Quotes older than five minutes are rejected before review, during preflight and immediately before requesting a signature. If pricing is unavailable, retry or explicitly choose **Enter a manual price**; no substitute quote is shipped.
+
+## Existing functionality retained
+
+- **Create:** fixed supply, deploy and launch together or deploy first, eligible base checks, 0–20% creator allocation, 0.3–5% resting tax, optional 99% launch decay, recipient settings, live contract preview and final acknowledgement.
+- **Explore/manage:** paginated factory events, search and filters, direct token lookup, current chain/tax information and owner-only launch, fee, distributor, liquidity and pairing controls.
+- **Wallets:** EIP-6963 browser-wallet discovery, injected fallback, Coinbase Wallet/Smart Wallet and mobile wallet-browser links behind one connect control.
+- **Transactions:** selected-chain simulation and infrastructure checks before signing, refreshed ownership/eligibility, duplicate prevention, rejected/pending/confirmed/reverted handling, receipt rechecks and chain-specific explorer links.
+
+Recipients default to the visitor's connected account. Custom recipients must be entered by the visitor. Native ETH's zero-address currency identifier is a contract convention; it is never used as a recipient.
+
+## Source map
+
+| Source | Purpose |
 | --- | --- |
-| `#/create` · `src/Create.tsx` | Launch workspace and review |
-| `#/explore` · `src/Explore.tsx` | Discovery and filters |
-| `#/manage` · `src/Explore.tsx` | Connected owner's loaded tokens |
-| `#/token/<address>` · `src/Token.tsx` | Live tax information and owner controls |
-| `#/how-it-works` · `src/App.tsx` | Economics, transfer rules, and verified addresses |
-| `src/contracts/` | Full ABIs, verified addresses, base definitions |
-| `src/chain.ts` | Contract reads, clone verification, eligibility, index pagination |
-| `src/transactions.tsx` | Simulation, wallet requests, and receipts |
-| `src/model.ts` | Exact unit parsing, allocation, validation, and configuration |
-| `src/config.ts`, `src/wallet.tsx` | RPC fallback and wallet connections |
-| `src/styles.css`, `src/ui.tsx` | Implemented design tokens and shared components |
+| `src/networks.ts`, `src/config.ts` | Network contracts, bases, RPCs and wallet chains |
+| `src/pricing.ts`, `src/StartingPrice.tsx` | Quotes, integer conversion and shared pricing controls |
+| `src/Create.tsx`, `src/Token.tsx` | Atomic creation and deferred owner-launch flows |
+| `src/Explore.tsx`, `src/chain.ts` | Discovery, token verification, eligibility and reads |
+| `src/transactions.tsx`, `src/wallet.tsx` | Simulation, signing, receipts and connection UI |
+| `src/model.ts`, `src/contracts/` | Validation, exact units, configuration and contract ABIs |
+| `src/App.tsx`, `src/ui.tsx`, `src/styles.css` | Routes, guide, shared controls and design system |
+
+Routes: `#/create`, `#/explore`, `#/manage`, `#/token/<address>`, and `#/how-it-works`.
 
 ## Checks actually run
 
-The final source/export was checked on 2026-10-17:
+Final source/export validation on **2026-10-18**:
 
 | Check | Result |
 | --- | --- |
-| `npm run typecheck` | Passed, TypeScript exit 0 |
-| `npm run build` | Passed, Vite exit 0; complete relative-path export |
-| `npm test` | **11/11** unit and ABI encoding tests passed |
-| `npm run validate` | **16/16** production browser scenarios passed in Chromium and WebKit |
-| Automated accessibility scans | **0 violations** in five sampled WCAG A/AA states |
-| Pinned `taste@1` probe | **16/16** checks passed at 320, 390, and 1440 px |
-| Live contract checks | **13/13** read-only simulations passed; ETH/IMD/FWA deployment and atomic launch, plus seven owner methods |
-| First mobile screen | At 390×844, the product and “Continue to launch” are visible; button bottom measured at 814.66 px |
+| Typecheck and production build, through `bash scripts/staged-build.sh` | Both passed, exit 0 |
+| `npm test` | **18/18** math, validation and ABI tests passed |
+| `npm run validate` | **21/21** production browser scenarios passed, Chromium and WebKit |
+| Automated accessibility | **0 violations** in seven sampled axe states |
+| Pinned `taste@1` | **16/16 Ethereum**, **16/16 Robinhood**, at 320/390/1440 px |
+| `npm run check:contracts` | **47/47** live read-only checks across both chains |
+| Mobile first screen | Product/form and primary action visible at 390×844 on both networks; button bottom 814.66 CSS px |
 
-The browser script starts and closes its own local static server at a subpath. To run it locally:
+The [validation report](artifacts/validation.md) records commands, evidence, fixes and the six-domain Better Interface review. [Interaction results](artifacts/interactions.json) and [contract results](artifacts/live-contract-checks.json) retain the actual checks. The browser script manages its own temporary subpath server and closes it afterwards. To reproduce locally after installing dependencies:
 
 ```sh
 npx playwright install chromium webkit
-npm run validate
 npm test
+npm run validate
 npm run check:contracts
 ```
 
-Linux may need Playwright's documented browser system dependencies. During this assignment, missing WebKit libraries and its TLS module were installed in temporary tooling directories; no system packages or browser binaries are included in the submission. The pinned probe was run with its Playwright module path explicitly supplied. See [validation](artifacts/validation.md) for evidence, environment workarounds, fixes, and the six-domain review.
+Playwright's Linux system dependencies may also be needed. Missing WebKit libraries were provided in temporary external tooling directories for this run; the actual WebKit flow passed. No browser binaries or dependencies are delivered. Tests use deterministic quote responses for exact arithmetic, a synthetic EIP-6963 wallet that rejects signing, and an explicitly simulated unlaunched owner state. Factory previews and other RPC reads remain live. These fixtures do not establish funded deployment success.
 
-`npm run check:contracts` only uses `eth_call` simulations and reads. `npm run validate` uses a synthetic EIP-6963 provider for wallet-specific tests; it obtains a **public onchain owner address** and rejects every signing request. Neither script broadcasts transactions. Check outputs go under `test/scratch/`, which is excluded from submission.
-
-`npm run share` regenerates `public/share.png` using the local font and code-drawn brand artwork; rebuild afterwards to update `dist/`.
+`npm run share` regenerates `public/share.png` using the bundled font and code-drawn artwork; rebuild afterwards to update the export.
 
 ## Practical limits
 
-- No funded mainnet deployment, wallet signature, mined transaction lifecycle, or real Coinbase passkey session was performed. Simulation success is not a guarantee of later execution. Actual mobile app handoffs need installed wallet apps and were not tested on physical devices.
-- Public RPC and Blockscout availability/rate limits can affect reads. Discovery is the set of loaded factory-event pages, not an exhaustive global token directory. Direct address lookup remains available when the index is down.
-- Token details refresh every 12 seconds and discovery reads every 30 seconds. These are block observations, not continuously guaranteed quotes. An unsuccessful refresh is labelled; cached values are not presented as newly read.
-- This is a token launch and management app. It explains exact-input-only swaps but does not include a trading router or protocol-owner administration for registering base conversion pools.
-- Launch settings are retained while navigating within the mounted app, but are not saved as drafts across reloads. Wallet reconnection uses wagmi storage. Pending transactions can always be inspected via the displayed explorer link; there is no backend transaction history.
-- Vite reports a bundle-size advisory for the main wallet/Ethereum application chunk (about 708 kB raw, 207 kB gzip). The complete export is under 1 MiB. No unnecessary archives or dependency caches are included.
-- Screen-reader sessions, native browser 200% zoom, physical devices, and exhaustive accessibility compliance were not verified. Automated scans and responsive screenshots are narrower checks.
+- No signature, funded deployment, broadcast, mined transaction lifecycle, real Coinbase passkey session or physical mobile-wallet handoff was performed. Successful read-only simulation does not guarantee future execution.
+- RPC, CoinGecko, DexScreener and explorer availability can interrupt reads. Robinhood's Blockscout API returned Cloudflare **403** during research; retry and direct token lookup remain available. Discovery covers loaded event pages, not an exhaustive directory.
+- USD prices are indicative third-party quotes. Positive liquidity is not a guarantee against stale or manipulated market prices. The app shows sources, freezes review inputs and provides a manual fallback.
+- Token details refresh every 12 seconds and discovery every 30 seconds. Cached chain observations are labelled; they are not price guarantees. Drafts survive in-app navigation but not a reload/network change. There is no backend transaction history.
+- Screen-reader sessions, browser-native 200% zoom, translations/RTL, physical devices and exhaustive accessibility compliance were not verified.
+- Vite reports a bundle-size advisory for the main wallet/application chunk (**720.21 kB raw, 211.09 kB gzip**); the build passes. The complete export is about 1 MiB. See the [packaging audit](artifacts/package-check.json) for exact sizes and inventory.
 
-## Attribution and packaging
+## Attribution and delivery
 
-DM Sans is bundled under the SIL Open Font License in `public/fonts/OFL.txt`. Wallet marks are from RainbowKit with its MIT license in `public/wallets/LICENSE.txt`; Lucide supplies interface icons. The token illustration and share composition are code-drawn for this site.
+DM Sans is bundled under the SIL Open Font License (`public/fonts/OFL.txt`). Wallet marks retain their MIT license (`public/wallets/LICENSE.txt`); interface icons use Lucide. Brand illustrations and the share composition are code-drawn.
 
-The pinned Better Interface guidance (Jakub Krehel, MIT, commit `267330e1adfc66a718fb65fa6918c1f06d0a689e`) and documentation method adapted from [Impeccable](https://github.com/pbakaus/impeccable/blob/9d715cc4f5564a990ca8345abfdd5df6dc9b41c8/skill/reference/document.md) (Paul Bakaus, Apache-2.0) informed the implementation and review. Their supplied combined license is retained in `artifacts/licenses/design-guidance.txt`.
+The pinned Better Interface guidance (Jakub Krehel, MIT, commit `267330e1adfc66a718fb65fa6918c1f06d0a689e`) and documentation method adapted from [Impeccable](https://github.com/pbakaus/impeccable/blob/9d715cc4f5564a990ca8345abfdd5df6dc9b41c8/skill/reference/document.md) (Paul Bakaus, Apache-2.0) informed implementation and review. The combined supplied license is retained in [artifacts/licenses/design-guidance.txt](artifacts/licenses/design-guidance.txt).
 
-[Path budgets](artifacts/path-budget.md) explicitly cover `.gitignore`. Dependency, cache, browser, and scratch directories are excluded at every nesting level. `dist/` is intentionally included alongside source and the lockfile. `.git/`, `.github/`, and `.env` files are not modified.
-
-The [packaging audit](artifacts/package-check.json) records the complete export inventory and final path sizes. The deliverable is below 2 MiB uncompressed, within the 8 MiB submission ceiling.
+The [path budget](artifacts/path-budget.md) explicitly covers the `.gitignore` evidence-directory inclusion. Dependency/cache exclusions remain active at every nesting level. The delivery retains the existing package manifest/lockfile and build configuration, includes `dist/`, and fits the **8 MiB** ceiling. Nothing is published or deployed by this task.

@@ -1,0 +1,377 @@
+{
+  "checkedAt": "2026-10-18T17:50:35.672Z",
+  "networks": [
+    {
+      "network": "ethereum",
+      "source": "https://ethereum-rpc.publicnode.com",
+      "chainId": 1,
+      "block": "26221051",
+      "checks": [
+        {
+          "name": "implementation @ 0x801411c6acec4fa80c75c5d3c0eae13c84f8a173",
+          "passed": true,
+          "value": "0x2df7DCf4D19a7924e00AE96629CC1d1261670eEe"
+        },
+        {
+          "name": "poolManager @ 0x05e1934d8b52a8ded4f3f42aa9a7a12244192544",
+          "passed": true,
+          "value": "0x000000000004444c5dc75cB358380D2e3dE08A90"
+        },
+        {
+          "name": "globalDistributorRegistry @ 0x05e1934d8b52a8ded4f3f42aa9a7a12244192544",
+          "passed": true,
+          "value": "0xDf99bd1218E7EB288CfFeCF9775385167Bb09B2D"
+        },
+        {
+          "name": "poolManager @ 0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e",
+          "passed": true,
+          "value": "0x000000000004444c5dc75cB358380D2e3dE08A90"
+        },
+        {
+          "name": "permit2 @ 0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e",
+          "passed": true,
+          "value": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+        },
+        {
+          "name": "contract code: factory",
+          "passed": true,
+          "value": 7523
+        },
+        {
+          "name": "contract code: hook",
+          "passed": true,
+          "value": 11981
+        },
+        {
+          "name": "contract code: implementation",
+          "passed": true,
+          "value": 14874
+        },
+        {
+          "name": "contract code: globalDistributorRegistry",
+          "passed": true,
+          "value": 881
+        },
+        {
+          "name": "contract code: poolManager",
+          "passed": true,
+          "value": 24009
+        },
+        {
+          "name": "contract code: positionManager",
+          "passed": true,
+          "value": 23877
+        },
+        {
+          "name": "contract code: permit2",
+          "passed": true,
+          "value": 9152
+        },
+        {
+          "name": "ETH preview, tokenIsCurrency0=false",
+          "passed": true,
+          "value": {
+            "requested": "0.00000006",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "322841316281130572655926080369853",
+              "tickLower": -887220,
+              "tickUpper": 166260,
+              "effectivePriceWei": "60225574129"
+            }
+          }
+        },
+        {
+          "name": "ETH preview, tokenIsCurrency0=true",
+          "passed": true,
+          "value": {
+            "requested": "0.00000006",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "19443303625737214134046098",
+              "tickLower": -166260,
+              "tickUpper": 887220,
+              "effectivePriceWei": "60225574129"
+            }
+          }
+        },
+        {
+          "name": "ETH create simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "ETH createAndLaunchAtPrice simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "IMD eligibility / metadata",
+          "passed": true,
+          "value": {
+            "status": [
+              true,
+              true
+            ],
+            "symbol": "IMD",
+            "decimals": 18
+          }
+        },
+        {
+          "name": "IMD preview, tokenIsCurrency0=false",
+          "passed": true,
+          "value": {
+            "requested": "0.00003",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "14430100122848938449791809866234",
+              "tickLower": -887220,
+              "tickUpper": 104100,
+              "effectivePriceWei": "30145360274860"
+            }
+          }
+        },
+        {
+          "name": "IMD preview, tokenIsCurrency0=true",
+          "passed": true,
+          "value": {
+            "requested": "0.00003",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "435000567005587132600735809",
+              "tickLower": -104100,
+              "tickUpper": 887220,
+              "effectivePriceWei": "30145360274860"
+            }
+          }
+        },
+        {
+          "name": "IMD create simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "IMD createAndLaunchAtPrice simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "FWA eligibility / metadata",
+          "passed": true,
+          "value": {
+            "status": [
+              true,
+              true
+            ],
+            "symbol": "FWA",
+            "decimals": 18
+          }
+        },
+        {
+          "name": "FWA preview, tokenIsCurrency0=false",
+          "passed": true,
+          "value": {
+            "requested": "0.01875",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "577225225712308488431160375188",
+              "tickLower": -887220,
+              "tickUpper": 39720,
+              "effectivePriceWei": "18839464887447705"
+            }
+          }
+        },
+        {
+          "name": "FWA preview, tokenIsCurrency0=true",
+          "passed": true,
+          "value": {
+            "requested": "0.01875",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "10874614371956112344667471218",
+              "tickLower": -39720,
+              "tickUpper": 887220,
+              "effectivePriceWei": "18839464887447705"
+            }
+          }
+        },
+        {
+          "name": "FWA create simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "FWA createAndLaunchAtPrice simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        }
+      ]
+    },
+    {
+      "network": "robinhood",
+      "source": "https://robinhood-rpc.publicnode.com",
+      "chainId": 4663,
+      "block": "91959874",
+      "checks": [
+        {
+          "name": "implementation @ 0x04c8ba34cb3fd5af9db06b8a25eaf1c8fb1ce738",
+          "passed": true,
+          "value": "0x6b8E414bbBAd57a9bA1c3828156C56BbCFE2aC8e"
+        },
+        {
+          "name": "poolManager @ 0x6e582dcdbb21902080124fc677db1ed8c1596544",
+          "passed": true,
+          "value": "0x8366a39CC670B4001A1121B8F6A443A643e40951"
+        },
+        {
+          "name": "globalDistributorRegistry @ 0x6e582dcdbb21902080124fc677db1ed8c1596544",
+          "passed": true,
+          "value": "0x00Df51C981193C701658f3a54AF4E256d752d17D"
+        },
+        {
+          "name": "poolManager @ 0x58daec3116aae6d93017baaea7749052e8a04fa7",
+          "passed": true,
+          "value": "0x8366a39CC670B4001A1121B8F6A443A643e40951"
+        },
+        {
+          "name": "permit2 @ 0x58daec3116aae6d93017baaea7749052e8a04fa7",
+          "passed": true,
+          "value": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+        },
+        {
+          "name": "contract code: factory",
+          "passed": true,
+          "value": 7523
+        },
+        {
+          "name": "contract code: hook",
+          "passed": true,
+          "value": 11981
+        },
+        {
+          "name": "contract code: implementation",
+          "passed": true,
+          "value": 14874
+        },
+        {
+          "name": "contract code: globalDistributorRegistry",
+          "passed": true,
+          "value": 1133
+        },
+        {
+          "name": "contract code: poolManager",
+          "passed": true,
+          "value": 24009
+        },
+        {
+          "name": "contract code: positionManager",
+          "passed": true,
+          "value": 23877
+        },
+        {
+          "name": "contract code: permit2",
+          "passed": true,
+          "value": 9152
+        },
+        {
+          "name": "ETH preview, tokenIsCurrency0=false",
+          "passed": true,
+          "value": {
+            "requested": "0.00000006",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "322841316281130572655926080369853",
+              "tickLower": -887220,
+              "tickUpper": 166260,
+              "effectivePriceWei": "60225574129"
+            }
+          }
+        },
+        {
+          "name": "ETH preview, tokenIsCurrency0=true",
+          "passed": true,
+          "value": {
+            "requested": "0.00000006",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "19443303625737214134046098",
+              "tickLower": -166260,
+              "tickUpper": 887220,
+              "effectivePriceWei": "60225574129"
+            }
+          }
+        },
+        {
+          "name": "ETH create simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "ETH createAndLaunchAtPrice simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "IMD eligibility / metadata",
+          "passed": true,
+          "value": {
+            "status": [
+              true,
+              true
+            ],
+            "symbol": "IMD",
+            "decimals": 18
+          }
+        },
+        {
+          "name": "IMD preview, tokenIsCurrency0=false",
+          "passed": true,
+          "value": {
+            "requested": "0.00003",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "14430100122848938449791809866234",
+              "tickLower": -887220,
+              "tickUpper": 104100,
+              "effectivePriceWei": "30145360274860"
+            }
+          }
+        },
+        {
+          "name": "IMD preview, tokenIsCurrency0=true",
+          "passed": true,
+          "value": {
+            "requested": "0.00003",
+            "preview": {
+              "creatorSupply": "100000000000000000000000000",
+              "lpSupply": "900000000000000000000000000",
+              "sqrtPriceX96": "435000567005587132600735809",
+              "tickLower": -104100,
+              "tickUpper": 887220,
+              "effectivePriceWei": "30145360274860"
+            }
+          }
+        },
+        {
+          "name": "IMD create simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        },
+        {
+          "name": "IMD createAndLaunchAtPrice simulation",
+          "passed": true,
+          "value": "eth_call only; no transaction sent"
+        }
+      ]
+    }
+  ]
+}

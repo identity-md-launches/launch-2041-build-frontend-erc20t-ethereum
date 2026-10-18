@@ -17,6 +17,7 @@ import { ArrowUpRight, Globe, LogOut, Wallet } from "lucide-react";
 import { shortAddress } from "./chain";
 import { AddressValue, Modal, Notice } from "./ui";
 import { errorMessage } from "./model";
+import { activeChain, NETWORK } from "./networks";
 const WalletContext = createContext<() => void>(() => {});
 export const useOpenWallet = () => useContext(WalletContext);
 const OPEN_IN = [
@@ -110,7 +111,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         ) : (
           <>
             <p className="muted modal-intro">
-              Choose a wallet to create and manage tokens on Ethereum.
+              Choose a wallet to create and manage tokens on {NETWORK.label}.
             </p>
             <div className="wallet-options">
               {mobile &&
@@ -185,10 +186,10 @@ export function ConnectControl() {
       <button
         className="button wallet-button"
         onClick={async () => {
-          if (isConnected && chainId !== 1) {
+          if (isConnected && chainId !== activeChain.id) {
             try {
               setError("");
-              await switchChain.mutateAsync({ chainId: 1 });
+              await switchChain.mutateAsync({ chainId: activeChain.id });
             } catch (e) {
               setError(errorMessage(e));
             }
@@ -197,10 +198,10 @@ export function ConnectControl() {
         disabled={switchChain.isPending}
       >
         <Wallet size={16} aria-hidden="true" />
-        {isConnected && chainId !== 1
+        {isConnected && chainId !== activeChain.id
           ? switchChain.isPending
             ? "Switching…"
-            : "Switch to Ethereum"
+            : `Switch to ${NETWORK.label}`
           : address
             ? shortAddress(address)
             : "Connect"}

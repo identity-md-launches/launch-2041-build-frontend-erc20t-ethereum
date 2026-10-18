@@ -1,0 +1,120 @@
+{
+  "checks": [
+    {
+      "name": "Static export loads at a subpath with title, favicon, local font and share image",
+      "passed": true
+    },
+    {
+      "name": "Responsive entry at 320, 390, 780 and 1440; primary action on first 390 screen",
+      "passed": true
+    },
+    {
+      "name": "Wallet dialog traps focus, restores trigger and handles no-provider rejection",
+      "passed": true
+    },
+    {
+      "name": "Token validation focuses invalid field and preserves values through steps",
+      "passed": true
+    },
+    {
+      "name": "Allocation, tax and launch decay update the preview; interval validation blocks review",
+      "passed": true
+    },
+    {
+      "name": "IMD and FWA eligibility and custom-base validation use Ethereum",
+      "passed": true
+    },
+    {
+      "name": "Recipient validation, rounded contract preview and pre-sign connection prompt",
+      "passed": true
+    },
+    {
+      "name": "Deploy-first flow defers price and preserves a reserved liquidity allocation",
+      "passed": true
+    },
+    {
+      "name": "Discovery loads real deployments; search and status/base filters recover from empty states",
+      "passed": true
+    },
+    {
+      "name": "Live token detail, complete addresses and owner-only permissions",
+      "passed": true
+    },
+    {
+      "name": "Mobile wallet sheet offers all four in-app paths plus Coinbase Smart Wallet",
+      "passed": true
+    },
+    {
+      "name": "Offline discovery shows a recoverable error, with address lookup still available",
+      "passed": true
+    },
+    {
+      "name": "No uncaught page errors or failed local resources in primary flows",
+      "passed": true
+    },
+    {
+      "name": "EIP-6963 named wallet, wrong-chain switch, owner permissions and rejected transaction",
+      "passed": true
+    },
+    {
+      "name": "Atomic launch reaches wallet with correct verified ABI, base units and zero base deposit",
+      "passed": true
+    },
+    {
+      "name": "Expired review quotes stop before any wallet signing request",
+      "passed": true
+    },
+    {
+      "name": "Deferred owner launch uses total supply for valuation and reserve for liquidity",
+      "passed": true
+    },
+    {
+      "name": "Market-cap presets calculate exactly, follow supply/base changes, and recover from quote errors",
+      "passed": true
+    },
+    {
+      "name": "Robinhood selection isolates deployments and quotes, switches wallets and encodes the correct launch",
+      "passed": true
+    },
+    {
+      "name": "No uncaught errors after network, pricing and wallet validation",
+      "passed": true
+    },
+    {
+      "name": "WebKit mobile completes token form, launch review and native wallet dialog",
+      "passed": true
+    }
+  ],
+  "limitations": [],
+  "axe": [
+    {
+      "label": "Create desktop",
+      "violations": []
+    },
+    {
+      "label": "Create review",
+      "violations": []
+    },
+    {
+      "label": "Explore",
+      "violations": []
+    },
+    {
+      "label": "Token permissions",
+      "violations": []
+    },
+    {
+      "label": "Mobile wallet",
+      "violations": []
+    },
+    {
+      "label": "Mobile market-cap controls",
+      "violations": []
+    },
+    {
+      "label": "Robinhood review",
+      "violations": []
+    }
+  ],
+  "errors": []
+}

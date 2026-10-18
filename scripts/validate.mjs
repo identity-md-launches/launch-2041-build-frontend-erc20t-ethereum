@@ -1,3 +1,9 @@
+import {
+  encodeFunctionResult,
+  decodeFunctionResult,
+  multicall3Abi,
+  parseUnits,
+} from "viem";
 /** Production browser validation. Wallet fixture rejects every signing request. */
 import { chromium, webkit, devices } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
@@ -7,6 +13,151 @@ import { resolve, extname, join } from "node:path";
 import assert from "node:assert/strict";
 import { createPublicClient, http, parseAbi, decodeFunctionData } from "viem";
 import { mainnet } from "viem/chains";
+import { tsImport } from "tsx/esm/api";
+const { NETWORKS } = await tsImport("../src/networks.ts", import.meta.url);
+const { marketCapPrice } = await tsImport("../src/pricing.ts", import.meta.url);
+const ownerToken = "0xA639FA428738787388a8290baC439B8fFBF9599a".toLowerCase();
+const ownerTokenAbi = JSON.parse(await readFile("src/contracts/token.json"));
+const fixtures = {
+  deferred: false,
+  failPrices: false,
+  eth: 2500,
+  imd: "5",
+  fwa: "0.008",
+};
+// Deterministic quotes exercise arithmetic; RPC reads/previews remain live.
+async function wire(context) {
+  context.on("page", (page) =>
+    page.on("pageerror", (e) => report.errors.push(e.message)),
+  );
+  await context.route(
+    /^https:\/\/(ethereum-rpc\.publicnode\.com|eth\.drpc\.org|robinhood-rpc\.publicnode\.com|rpc\.mainnet\.chain\.robinhood\.com)/,
+    async (route) => {
+      const isRobinhood = /robinhood/.test(route.request().url());
+      const id = isRobinhood ? 4663 : 1;
+      const network = isRobinhood ? NETWORKS.robinhood : NETWORKS.ethereum;
+      try {
+        const body = JSON.parse(route.request().postData() || "{}");
+        const methods = Array.isArray(body) ? body : [body];
+        assert(
+          !methods.some((x) => /send|sign/i.test(x.method)),
+          "Validation never broadcasts",
+        );
+        const response = await fetch(
+          process.env[`ERC20T_RPC_${id}`] || network.rpcUrls[0],
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        const responseBody = await response.json();
+        if (fixtures.deferred) {
+          const replies = Array.isArray(responseBody)
+            ? responseBody
+            : [responseBody];
+          for (const reply of replies) {
+            const request = methods.find((m) => m.id === reply.id);
+            if (request?.method !== "eth_call") continue;
+            const call = request.params[0];
+            if (call.to?.toLowerCase() === ownerToken) {
+              const decoded = decodeFunctionData({
+                abi: ownerTokenAbi,
+                data: call.data,
+              });
+              if (decoded.functionName === "launch") {
+                delete reply.error;
+                reply.result = "0x";
+              }
+            } else if (
+              call.to?.toLowerCase() ===
+                "0xca11bde05977b3631167028862be2a173976ca11" &&
+              reply.result
+            ) {
+              const decoded = decodeFunctionData({
+                abi: multicall3Abi,
+                data: call.data,
+              });
+              if (decoded.functionName !== "aggregate3") continue;
+              const results = [
+                ...decodeFunctionResult({
+                  abi: multicall3Abi,
+                  functionName: "aggregate3",
+                  data: reply.result,
+                }),
+              ];
+              decoded.args[0].forEach((sub, i) => {
+                if (sub.target.toLowerCase() !== ownerToken) return;
+                const fn = decodeFunctionData({
+                  abi: ownerTokenAbi,
+                  data: sub.callData,
+                }).functionName;
+                if (fn === "launched" || fn === "balanceOf")
+                  results[i] = {
+                    success: true,
+                    returnData: encodeFunctionResult({
+                      abi: ownerTokenAbi,
+                      functionName: fn,
+                      result:
+                        fn === "launched" ? false : parseUnits("900000000", 18),
+                    }),
+                  };
+              });
+              reply.result = encodeFunctionResult({
+                abi: multicall3Abi,
+                functionName: "aggregate3",
+                result: results,
+              });
+            }
+          }
+        }
+        await route.fulfill({
+          status: response.status,
+          contentType: "application/json",
+          body: JSON.stringify(responseBody),
+        });
+      } catch {
+        await route.abort();
+      }
+    },
+  );
+  await context.route("https://api.coingecko.com/**", (route) =>
+    route.fulfill({
+      status: fixtures.failPrices ? 503 : 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ethereum: {
+          usd: fixtures.eth,
+          last_updated_at: Math.floor(Date.now() / 1000),
+        },
+      }),
+    }),
+  );
+  await context.route("https://api.dexscreener.com/token-pairs/**", (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/");
+    const chainId = parts[3],
+      address = parts[4];
+    const base = NETWORKS[chainId]?.bases.find(
+      (b) => b.address.toLowerCase() === address.toLowerCase(),
+    );
+    return route.fulfill({
+      status: fixtures.failPrices ? 503 : 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        base
+          ? [
+              {
+                chainId,
+                baseToken: { address },
+                priceUsd: base.symbol === "IMD" ? fixtures.imd : fixtures.fwa,
+                liquidity: { usd: 1000000 },
+              },
+            ]
+          : [],
+      ),
+    });
+  });
+}
 const out = resolve("test/scratch/interactions");
 await mkdir(out, { recursive: true });
 const root = resolve("dist");
@@ -65,6 +216,7 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
   reducedMotion: "reduce",
 });
+await wire(context);
 const page = await context.newPage();
 activePage = page;
 page.on("pageerror", (e) => report.errors.push(e.message));
@@ -110,6 +262,7 @@ async function basicFlow(p) {
   await p
     .getByText("ETH is eligible for this launch", { exact: true })
     .waitFor();
+  await p.locator(".quote-details .price-value").waitFor();
 }
 try {
   await check(
@@ -117,7 +270,7 @@ try {
     async () => {
       await page.goto(origin);
       await page.evaluate(() => document.fonts.ready);
-      assert.equal(await page.title(), "ERC20T · Create an Ethereum token");
+      assert.equal(await page.title(), "ERC20T · Create a token on Ethereum");
       assert.equal(
         (await page.request.get(origin + "share.png")).status(),
         200,
@@ -302,7 +455,7 @@ try {
       await page
         .getByRole("button", { name: "Continue to launch", exact: true })
         .click();
-      assert.equal(await page.locator("#price").count(), 0);
+      assert.equal(await page.locator(".starting-price").count(), 0);
       await page
         .getByRole("button", { name: "Review token", exact: true })
         .click();
@@ -379,7 +532,7 @@ try {
         .getByRole("button", { name: "Check permissions", exact: true })
         .click();
       await page
-        .getByText("Enter a valid Ethereum address.", { exact: true })
+        .getByText("Enter a valid wallet or contract address.", { exact: true })
         .waitFor();
       await page
         .locator("summary")
@@ -413,6 +566,7 @@ try {
     "Mobile wallet sheet offers all four in-app paths plus Coinbase Smart Wallet",
     async () => {
       const phone = await browser.newContext({ ...devices["iPhone 13"] });
+      await wire(phone);
       const p = await phone.newPage();
       await p.goto(origin);
       await p.getByRole("button", { name: "Connect", exact: true }).click();
@@ -462,7 +616,9 @@ try {
   // A synthetic EIP-6963 provider returns a public onchain owner address and always rejects signing.
   const rpc = createPublicClient({
     chain: mainnet,
-    transport: http("https://ethereum-rpc.publicnode.com"),
+    transport: http(
+      process.env.ERC20T_RPC_1 || "https://ethereum-rpc.publicnode.com",
+    ),
   });
   const observedOwner = await rpc.readContract({
     address: "0xA639FA428738787388a8290baC439B8fFBF9599a",
@@ -472,10 +628,12 @@ try {
   const walletContext = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
+  await wire(walletContext);
   await walletContext.addInitScript(
     ({ account }) => {
+      if (!/^https?:$/.test(location.protocol) || window.top !== window) return;
       const callbacks = {};
-      let chain = "0x1";
+      let chain = localStorage.getItem("validation-wallet-chain") || "0x1";
       let authorized =
         localStorage.getItem("validation-wallet-authorized") === "true";
       window.__walletCalls = [];
@@ -494,6 +652,7 @@ try {
             method === "wallet_addEthereumChain"
           ) {
             chain = params[0].chainId;
+            localStorage.setItem("validation-wallet-chain", chain);
             for (const cb of callbacks.chainChanged || []) cb(chain);
             return null;
           }
@@ -509,11 +668,16 @@ try {
               code: 4001,
             });
           if (method === "wallet_getCapabilities") return {};
-          const r = await fetch("https://ethereum-rpc.publicnode.com", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-          });
+          const r = await fetch(
+            Number(BigInt(chain)) === 4663
+              ? "https://robinhood-rpc.publicnode.com"
+              : "https://ethereum-rpc.publicnode.com",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+            },
+          );
           const data = await r.json();
           if (data.error)
             throw Object.assign(new Error(data.error.message), data.error);
@@ -645,12 +809,320 @@ try {
       const decoded = decodeFunctionData({ abi, data: sent.data });
       assert.equal(decoded.functionName, "createAndLaunchAtPrice");
       assert.equal(decoded.args[1], 1000);
-      assert.equal(decoded.args[2], 10000000000n);
+      assert.equal(
+        decoded.args[2],
+        marketCapPrice(150_000, 10n ** 27n, "2500", 18),
+      );
+      assert.equal(
+        decoded.args[0].hook.toLowerCase(),
+        NETWORKS.ethereum.contracts.hook,
+      );
       assert.equal(
         decoded.args[0].owner.toLowerCase(),
         observedOwner.toLowerCase(),
       );
     },
+  );
+  await check(
+    "Expired review quotes stop before any wallet signing request",
+    async () => {
+      activePage = w;
+      await basicFlow(w);
+      await w
+        .getByRole("button", { name: "Review token", exact: true })
+        .click();
+      await w.getByRole("checkbox").check();
+      const before = await w.evaluate(
+        () =>
+          window.__walletCalls.filter((x) => x.method === "eth_sendTransaction")
+            .length,
+      );
+      await w.clock.install();
+      await w.clock.setFixedTime(new Date(Date.now() + 301_000));
+      await w
+        .getByRole("button", { name: "Deploy & launch token", exact: true })
+        .click();
+      await w
+        .getByText(
+          "The price quote has expired. Go back and refresh prices before reviewing again.",
+          { exact: true },
+        )
+        .waitFor();
+      const after = await w.evaluate(
+        () =>
+          window.__walletCalls.filter((x) => x.method === "eth_sendTransaction")
+            .length,
+      );
+      assert.equal(after, before);
+      await w.clock.setFixedTime(new Date());
+    },
+  );
+  await check(
+    "Deferred owner launch uses total supply for valuation and reserve for liquidity",
+    async () => {
+      fixtures.deferred = true;
+      activePage = w;
+      await w.goto(origin + "#/token/" + ownerToken);
+      await w
+        .getByRole("heading", { name: "Open your market", exact: true })
+        .waitFor();
+      await w.locator(".quote-details .price-value").waitFor();
+      await w.getByRole("radio", { name: "~$50k", exact: true }).check();
+      const totalSupply = await rpc.readContract({
+        address: ownerToken,
+        abi: ownerTokenAbi,
+        functionName: "totalSupply",
+      });
+      const quote = await rpc.readContract({
+        address: ownerToken,
+        abi: ownerTokenAbi,
+        functionName: "quoteToken",
+      });
+      const base = NETWORKS.ethereum.bases.find(
+        (b) => b.address === quote.toLowerCase(),
+      );
+      assert(base);
+      const usd =
+        base.symbol === "ETH" ? "2500" : base.symbol === "IMD" ? "5" : "0.008";
+      const price = marketCapPrice(50_000, totalSupply, usd, base.decimals);
+      const preview = await rpc.readContract({
+        address: NETWORKS.ethereum.contracts.factory,
+        abi: JSON.parse(await readFile("src/contracts/factory.json")),
+        functionName: "previewQuotedLaunch",
+        args: [
+          parseUnits("900000000", 18),
+          0,
+          price,
+          BigInt(ownerToken) < BigInt(quote),
+        ],
+      });
+      await w
+        .getByRole("button", { name: "Preview & launch", exact: true })
+        .click();
+      const dialog = w.getByRole("dialog", {
+        name: "Launch the token",
+        exact: true,
+      });
+      await dialog.getByText(/Target market cap: ~\$50,000/).waitFor();
+      await dialog
+        .getByRole("button", { name: "Confirm in wallet", exact: true })
+        .click();
+      await dialog
+        .getByText(
+          "The wallet request was declined. Your settings are still here; try again when ready.",
+          { exact: true },
+        )
+        .waitFor({ timeout: 30000 });
+      const sent = await w.evaluate(() => window.__lastTransaction);
+      const decoded = decodeFunctionData({
+        abi: ownerTokenAbi,
+        data: sent.data,
+      });
+      assert.equal(decoded.functionName, "launch");
+      assert.equal(decoded.args[0], preview.sqrtPriceX96);
+      assert.equal(decoded.args[1], preview.tickLower);
+      assert.equal(decoded.args[2], preview.tickUpper);
+      await w.keyboard.press("Escape");
+      fixtures.deferred = false;
+    },
+  );
+  await check(
+    "Market-cap presets calculate exactly, follow supply/base changes, and recover from quote errors",
+    async () => {
+      const c = await browser.newContext({
+        viewport: { width: 390, height: 844 },
+      });
+      await wire(c);
+      const p = await c.newPage();
+      activePage = p;
+      await basicFlow(p);
+      const expectPrice = async (price, symbol) => {
+        await p
+          .locator(".quote-details .price-value")
+          .filter({ hasText: `${price} ${symbol} per token` })
+          .waitFor();
+      };
+      for (const [cap, amount] of [
+        ["~$50k", "0.00000002"],
+        ["~$150k", "0.00000006"],
+        ["~$500k", "0.0000002"],
+        ["~$1m", "0.0000004"],
+      ]) {
+        await p.getByRole("radio", { name: cap, exact: true }).check();
+        await expectPrice(amount, "ETH");
+      }
+      await p.getByRole("button", { name: "IMD", exact: true }).click();
+      await expectPrice("0.0002", "IMD");
+      await p.getByRole("button", { name: "FWA", exact: true }).click();
+      await expectPrice("0.125", "FWA");
+      await axe(p, "Mobile market-cap controls");
+      await p.getByRole("button", { name: "Back", exact: true }).click();
+      await p.getByLabel("Total supply", { exact: true }).fill("2000000000");
+      await p
+        .getByRole("button", { name: "Continue to launch", exact: true })
+        .click();
+      await expectPrice("0.0625", "FWA");
+      fixtures.failPrices = true;
+      await p
+        .getByRole("button", { name: "Refresh prices", exact: true })
+        .click();
+      await p
+        .getByText(/Base-token pricing is unavailable/)
+        .waitFor({ timeout: 30000 });
+      await p
+        .getByRole("button", { name: "Review token", exact: true })
+        .click();
+      assert.equal(
+        await p.getByRole("heading", { name: "Shape your launch" }).count(),
+        1,
+      );
+      await p
+        .getByRole("button", { name: "Enter a manual price", exact: true })
+        .click();
+      await p
+        .getByLabel("Starting price (FWA per token)", { exact: true })
+        .fill("0.04");
+      await p
+        .getByRole("button", { name: "Review token", exact: true })
+        .click();
+      await p.getByRole("heading", { name: "Ready for Ethereum" }).waitFor();
+      await p
+        .locator(".review-list dd")
+        .filter({ hasText: "0.04 FWA" })
+        .waitFor();
+      fixtures.failPrices = false;
+      await p.getByRole("button", { name: "Back", exact: true }).click();
+      await p
+        .getByRole("button", { name: "Use market-cap options", exact: true })
+        .click();
+      await p
+        .getByRole("button", { name: "Refresh prices", exact: true })
+        .click();
+      await expectPrice("0.0625", "FWA");
+      await c.close();
+    },
+  );
+  await check(
+    "Robinhood selection isolates deployments and quotes, switches wallets and encodes the correct launch",
+    async () => {
+      activePage = w;
+      await w.goto(origin);
+      await w
+        .getByLabel("Token name", { exact: true })
+        .fill("Discarded on network change");
+      await w
+        .getByRole("combobox", { name: "Network", exact: true })
+        .selectOption("robinhood");
+      await w.waitForURL(/network=robinhood/);
+      assert.equal(
+        await w.getByLabel("Token name", { exact: true }).inputValue(),
+        "",
+      );
+      await w
+        .getByRole("button", { name: "Switch to Robinhood", exact: true })
+        .click();
+      await w.getByRole("button", { name: /0x91e7/ }).waitFor();
+      await w.setViewportSize({ width: 390, height: 844 });
+      const box = await w
+        .getByRole("button", { name: "Continue to launch", exact: true })
+        .boundingBox();
+      assert(
+        box.y + box.height < 844,
+        `Connected Robinhood CTA bottom ${box.y + box.height}`,
+      );
+      assert(
+        await w.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await w.screenshot({
+        path: join(out, "robinhood-390.png"),
+        fullPage: true,
+      });
+      await w.setViewportSize({ width: 1440, height: 1000 });
+      await w
+        .getByLabel("Token name", { exact: true })
+        .fill("Robinhood validation");
+      await w.getByLabel("Symbol", { exact: true }).fill("CHECK");
+      await w
+        .getByRole("button", { name: "Continue to launch", exact: true })
+        .click();
+      await w.locator(".quote-details .price-value").waitFor();
+      assert.equal(
+        await w.getByRole("button", { name: "FWA", exact: true }).count(),
+        0,
+      );
+      await w.getByRole("button", { name: "IMD", exact: true }).click();
+      await w
+        .getByText("IMD is eligible for this launch", { exact: true })
+        .waitFor();
+      await w.getByRole("radio", { name: "~$500k", exact: true }).check();
+      await w
+        .locator(".quote-details .price-value")
+        .filter({ hasText: "0.0001 IMD" })
+        .waitFor();
+      await w
+        .getByRole("button", { name: "Review token", exact: true })
+        .click();
+      await w.getByRole("heading", { name: "Ready for Robinhood" }).waitFor();
+      await w.getByRole("checkbox").check();
+      await axe(w, "Robinhood review");
+      await w
+        .getByRole("button", { name: "Deploy & launch token", exact: true })
+        .click();
+      await w
+        .getByText(
+          "The wallet request was declined. Your settings are still here; try again when ready.",
+          { exact: true },
+        )
+        .waitFor({ timeout: 30000 });
+      const sent = await w.evaluate(() => window.__lastTransaction);
+      assert.equal(sent.to.toLowerCase(), NETWORKS.robinhood.contracts.factory);
+      assert.equal(BigInt(sent.value || "0x0"), 0n);
+      const abi = JSON.parse(await readFile("src/contracts/factory.json"));
+      const decoded = decodeFunctionData({ abi, data: sent.data });
+      assert.equal(
+        decoded.args[0].hook.toLowerCase(),
+        NETWORKS.robinhood.contracts.hook,
+      );
+      assert.equal(
+        decoded.args[0].positionManager.toLowerCase(),
+        NETWORKS.robinhood.contracts.positionManager,
+      );
+      assert.equal(
+        decoded.args[0].quoteToken.toLowerCase(),
+        NETWORKS.robinhood.bases[1].address,
+      );
+      assert.equal(
+        decoded.args[2],
+        marketCapPrice(500_000, 10n ** 27n, "5", 18),
+      );
+      const calls = await w.evaluate(() => window.__walletCalls);
+      assert(
+        calls.some(
+          (x) =>
+            x.method === "wallet_switchEthereumChain" &&
+            Number(BigInt(x.params[0].chainId)) === 4663,
+        ),
+      );
+      await w
+        .getByRole("link", { name: "How it works", exact: true })
+        .last()
+        .click();
+      await w
+        .locator(".deployment-addresses")
+        .getByText("Global distributor registry", { exact: true })
+        .waitFor();
+      assert(
+        (await w.locator(".deployment-addresses").innerText())
+          .toLowerCase()
+          .includes(NETWORKS.robinhood.contracts.globalDistributorRegistry),
+      );
+    },
+  );
+  await check(
+    "No uncaught errors after network, pricing and wallet validation",
+    async () => assert.deepEqual(report.errors, []),
   );
   await walletContext.close();
   try {
@@ -660,7 +1132,11 @@ try {
     console.warn("WebKit unavailable");
   }
   if (safari) {
-    const p = await safari.newPage({ viewport: { width: 390, height: 844 } });
+    const safariContext = await safari.newContext({
+      viewport: { width: 390, height: 844 },
+    });
+    await wire(safariContext);
+    const p = await safariContext.newPage();
     activePage = p;
     await check(
       "WebKit mobile completes token form, launch review and native wallet dialog",

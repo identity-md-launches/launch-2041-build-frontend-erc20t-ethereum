@@ -1,0 +1,109 @@
+{
+  "checkedAt": "2026-10-18T18:16:49.758645+00:00",
+  "ceilingBytes": 8388608,
+  "measurement": "Conservative sum of complete delivery working-tree file bytes, including unchanged source and lockfile; no Git object mutation or commit was performed.",
+  "deliveryFileCount": 70,
+  "deliveryFileBytes": 2174449,
+  "remainingBytes": 6214159,
+  "distBytes": 974805,
+  "artifactsBytes": 692067,
+  "distMatchesProductionBuild": true,
+  "applicationSourceAndPublicAssetsMatchBuildInputs": true,
+  "requiredMetadataPresent": true,
+  "entryAndCssAssetReferencesResolveRelatively": true,
+  "documentationLinksResolve": true,
+  "forbiddenConfigAndDependencyPathsUnchanged": true,
+  "dependencyCachesArchivesSymlinksAndSubmodulesInDelivery": [],
+  "gitDiffWhitespaceCheckPassed": true,
+  "artifactsIncludedByGitIgnoreRules": true,
+  "ignoreFileBudgetBytes": 1024,
+  "ignoreFileActualBytes": 331,
+  "exportInventory": [
+    {
+      "path": "dist/assets/ccip-DArP2WnB.js",
+      "bytes": 2888,
+      "sha256": "0feca1599fb23845ffede8463e2bfbcb58a052f1d8f36dd3399ec9c46a6f0394"
+    },
+    {
+      "path": "dist/assets/index-BwQCvUTt.js",
+      "bytes": 112750,
+      "sha256": "78d968c9c54f4b745fc696fca1b229cf112912c95587b84b333a29883d88034e"
+    },
+    {
+      "path": "dist/assets/index-CgBRQMme.js",
+      "bytes": 720211,
+      "sha256": "7101887491d75e0dfdc3720f3a53142647ad6d449a6fd42a0d0d4912569d7b44"
+    },
+    {
+      "path": "dist/assets/index-CzHpOz34.css",
+      "bytes": 36874,
+      "sha256": "67700d9ba540bf4369e279ed3878c0059d2e3ae4e5ec56a54fa1778d76fcef5a"
+    },
+    {
+      "path": "dist/favicon.svg",
+      "bytes": 263,
+      "sha256": "c0a9bd058a686efb3139248e687d5ea6a3c1f18e1f9b684f1891df9273c49b33"
+    },
+    {
+      "path": "dist/fonts/OFL.txt",
+      "bytes": 4482,
+      "sha256": "9af36190332437f5ecd09974de43c1f7c77a310a996cdd8ceb25628b458840e1"
+    },
+    {
+      "path": "dist/fonts/dm-sans-latin.woff2",
+      "bytes": 36932,
+      "sha256": "9fea608a947e67020c33cad9a6fe3d60c54119dfb8cff87768a8117a15ed7543"
+    },
+    {
+      "path": "dist/index.html",
+      "bytes": 1212,
+      "sha256": "6af0d099854f5edcc2017715289d56e2991fde9ccaf419f45c1dc2fa71467228"
+    },
+    {
+      "path": "dist/share.png",
+      "bytes": 52775,
+      "sha256": "116d770afbd95e9d8a6af0e02f1691cfed916c3785264764a83b6a587363e6bb"
+    },
+    {
+      "path": "dist/wallets/LICENSE.txt",
+      "bytes": 1064,
+      "sha256": "5095037afa1ba03be36e04305c01ec9ee600e14377738a026482b1a888c4e365"
+    },
+    {
+      "path": "dist/wallets/coinbase.svg",
+      "bytes": 538,
+      "sha256": "74b55347075cbbb2a0292cca0f94459d531afd23586ecfd2fcc670236c590439"
+    },
+    {
+      "path": "dist/wallets/metaMask.svg",
+      "bytes": 1665,
+      "sha256": "892c7dfab8c4ca5682878dda3f42f55a75195d7d365e4adb0832845f3a0a2135"
+    },
+    {
+      "path": "dist/wallets/phantom.svg",
+      "bytes": 861,
+      "sha256": "f841f8112e131259a2e5123177950099c79487e61e77971f4e193e6c374419eb"
+    },
+    {
+      "path": "dist/wallets/rabby.svg",
+      "bytes": 2290,
+      "sha256": "dcae4de88ebfa10cffa1fe28df13d7c8c0b40736ef2b704f1f2fc348e777e443"
+    }
+  ],
+  "topLevelBytes": {
+    ".gitignore": 331,
+    "DESIGN.md": 13878,
+    "README.md": 10821,
+    "artifacts": 692067,
+    "dist": 974805,
+    "index.html": 1113,
+    "package-lock.json": 79543,
+    "package.json": 950,
+    "public": 100870,
+    "scripts": 51307,
+    "src": 238572,
+    "tests": 9434,
+    "tsconfig.json": 550,
+    "vite.config.ts": 208
+  }
+}

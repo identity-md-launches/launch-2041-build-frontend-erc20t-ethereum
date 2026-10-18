@@ -1,0 +1,59 @@
+{
+  "method": "WCAG relative luminance, using computed CSS custom properties from the final rendered export",
+  "pairs": [
+    {
+      "name": "Text / page",
+      "foreground": "#242b23",
+      "background": "#f6f5f1",
+      "ratio": 13.32
+    },
+    {
+      "name": "Muted / page",
+      "foreground": "#61665b",
+      "background": "#f6f5f1",
+      "ratio": 5.41
+    },
+    {
+      "name": "Muted / preview",
+      "foreground": "#61665b",
+      "background": "#efeee7",
+      "ratio": 5.07
+    },
+    {
+      "name": "Primary button",
+      "foreground": "#ffffff",
+      "background": "#bf4026",
+      "ratio": 5.28
+    },
+    {
+      "name": "Accent / page",
+      "foreground": "#bf4026",
+      "background": "#f6f5f1",
+      "ratio": 4.84
+    },
+    {
+      "name": "Selected text",
+      "foreground": "#242b23",
+      "background": "#fff0e9",
+      "ratio": 13.08
+    },
+    {
+      "name": "Focus / white",
+      "foreground": "#486b3f",
+      "background": "#ffffff",
+      "ratio": 6.09
+    },
+    {
+      "name": "Focus / page",
+      "foreground": "#486b3f",
+      "background": "#f6f5f1",
+      "ratio": 5.58
+    },
+    {
+      "name": "Error",
+      "foreground": "#a62d23",
+      "background": "#fff0ec",
+      "ratio": 6.27
+    }
+  ]
+}

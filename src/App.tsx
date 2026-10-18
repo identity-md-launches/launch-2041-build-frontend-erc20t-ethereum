@@ -6,6 +6,8 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import { CONTRACTS } from "./contracts";
+import { activeChain, NETWORK, NETWORKS, networkKey } from "./networks";
+import { explorer } from "./chain";
 import { Create } from "./Create";
 import { Explore } from "./Explore";
 import { TokenPage } from "./Token";
@@ -31,7 +33,7 @@ export default function App() {
     if (page === "create") setVisitedCreate(true);
     document.title =
       page === "create"
-        ? "ERC20T · Create an Ethereum token"
+        ? `ERC20T · Create a token on ${NETWORK.label}`
         : page === "explore"
           ? "Explore tokens · ERC20T"
           : page === "manage"
@@ -83,15 +85,27 @@ export default function App() {
             </a>
           </nav>
           <div className="header-utilities">
-            <span className="network-label">
-              <svg viewBox="0 0 20 28" aria-hidden="true">
-                <path
-                  d="m10 0 9 15-9 5-9-5ZM1 17l9 11 9-11-9 5Z"
-                  fill="currentColor"
-                />
-              </svg>
-              Ethereum
-              <span className="network-dot" />
+            <label className="network-select">
+              <span className="sr-only">Network</span>
+              <select
+                value={networkKey}
+                aria-describedby="network-help"
+                onChange={(e) => {
+                  const url = new URL(location.href);
+                  url.searchParams.set("network", e.target.value);
+                  if (page === "token") url.hash = "/explore";
+                  location.assign(url.href);
+                }}
+              >
+                {Object.entries(NETWORKS).map(([key, network]) => (
+                  <option key={key} value={key}>
+                    {network.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span id="network-help" className="sr-only">
+              Changing network clears the current launch draft and review.
             </span>
             <ConnectControl />
           </div>
@@ -100,7 +114,7 @@ export default function App() {
       <main id="main-content" className="main-content" tabIndex={-1}>
         {visitedCreate && (
           <div hidden={page !== "create"}>
-            <Create />
+            <Create active={page === "create"} />
           </div>
         )}
         {page === "explore" && <Explore />}
@@ -126,16 +140,16 @@ export default function App() {
           <Mark small />
           <span>ERC20T</span>
           <span className="footer-divider">/</span>
-          <span>Built on Ethereum. Powered by Uniswap v4.</span>
+          <span>Built on {NETWORK.label}. Powered by Uniswap v4.</span>
         </div>
         <div>
           <a href="#/how-it-works">How it works</a>
           <a
-            href={`https://etherscan.io/address/${CONTRACTS.hook}#code`}
+            href={`${explorer(CONTRACTS.hook)}#code`}
             target="_blank"
             rel="noreferrer"
           >
-            Verified contracts
+            View contracts
             <ArrowUpRight size={14} />
           </a>
         </div>
@@ -169,24 +183,29 @@ function Guide() {
           <h2>Two ways to launch</h2>
           <p>
             <strong>Deploy & launch</strong> creates your token and its pool in
-            a single Ethereum transaction. You set the starting price in base
-            units per whole token. The factory aligns it to an eligible tick and
-            resolves address ordering.
+            a single transaction on {NETWORK.label}. Choose an approximate USD
+            market cap; the app divides it by total supply and the current
+            base-token USD price. The factory aligns the result to an eligible
+            tick and resolves address ordering. You can also enter a manual base
+            price.
           </p>
           <p>
             <strong>Deploy first</strong> creates a token with its liquidity
             reserve held inside the contract. The token owner later sets the
-            starting price and launches from the owner console. Supply, base
-            currency, and the launch decay schedule are fixed at deployment.
+            starting market cap and launches from the owner console. Supply,
+            base currency, and the launch decay schedule are fixed at
+            deployment.
           </p>
         </section>
         <section>
           <h2>Choose the base</h2>
           <p>
-            Native ETH is always supported. IMD and FWA are registered external
-            bases; their live permission is checked before a new launch. Another
-            base must be enabled in the hook registry, or be an already
-            launched, ETH-paired ERC20T using this hook with pairing enabled.
+            Native ETH is always supported.{" "}
+            {NETWORK.label === "Ethereum" ? "IMD and FWA are" : "IMD is"}{" "}
+            configured as external bases; live permission is checked before a
+            new launch. Another base must be enabled in the hook registry, or be
+            an already launched, ETH-paired ERC20T using this hook with pairing
+            enabled.
           </p>
           <p>
             Pool eligibility does not guarantee compatible behavior from every
@@ -245,16 +264,18 @@ function Guide() {
           </p>
           <p>
             Discovery uses factory events indexed by Blockscout, then checks the
-            clone’s bytecode and reads token state from Ethereum. Live read
-            failures are shown explicitly, with retry controls.
+            clone’s bytecode and reads token state from {NETWORK.label}. Live
+            read failures are shown explicitly, with retry controls.
           </p>
         </section>
       </div>
       <section className="deployment-addresses">
         <h2>The deployed contracts</h2>
-        <p className="muted">Ethereum mainnet · chain ID 1</p>
+        <p className="muted">
+          {activeChain.name} · chain ID {activeChain.id}
+        </p>
         {Object.entries(CONTRACTS)
-          .slice(0, 3)
+          .slice(0, 4)
           .map(([name, address]) => (
             <div key={name}>
               <strong>
@@ -262,18 +283,20 @@ function Guide() {
                   ? "Token factory"
                   : name === "hook"
                     ? "Shared tax hook"
-                    : "Token implementation"}
+                    : name === "implementation"
+                      ? "Token implementation"
+                      : "Global distributor registry"}
               </strong>
               <AddressValue address={address} />
             </div>
           ))}
         <a
           className="text-link"
-          href="https://sourcify.dev/#/lookup/0xed9a04fa6693e754661a22502524df9b1857e544"
+          href={explorer(CONTRACTS.hook)}
           target="_blank"
           rel="noreferrer"
         >
-          View verified source on Sourcify
+          View hook on {activeChain.blockExplorers.default.name}
           <ChevronRight size={16} />
         </a>
       </section>

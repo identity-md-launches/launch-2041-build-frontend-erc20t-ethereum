@@ -2375,3 +2375,129 @@ select {
     border: 1px solid CanvasText;
   }
 }
+
+/* Network selection is always available, including phones. */
+.network-select select {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  width: 126px;
+  padding: 8px;
+  cursor: pointer;
+}
+.starting-price {
+  margin-block: 24px;
+}
+.starting-price legend {
+  font-weight: 600;
+  margin-block-end: 4px;
+}
+.marketcap-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-block: 12px;
+}
+.marketcap-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 48px;
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.marketcap-option input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+.marketcap-option:hover {
+  background: var(--color-preview);
+}
+.marketcap-option.selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.marketcap-option:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.price-mode {
+  margin-block: 12px;
+  min-height: 44px;
+  text-decoration: underline;
+}
+.quote-details {
+  border-block-start: 1px solid var(--color-border);
+  padding-block-start: 12px;
+  min-width: 0;
+}
+.quote-details .field-hint {
+  margin-block-start: 8px;
+}
+.quote-details a {
+  text-decoration: underline;
+}
+.quote-refresh {
+  min-height: 44px;
+  gap: 5px;
+  padding-inline: 8px;
+}
+.price-value {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.review-list dd {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1080px) {
+  .header-utilities {
+    gap: 10px;
+  }
+}
+@media (max-width: 570px) {
+  .header-inner {
+    padding-inline: 16px;
+  }
+  .header-utilities {
+    gap: 8px;
+    flex-shrink: 0;
+    min-height: 62px;
+  }
+  .network-select select {
+    width: 120px;
+    font-size: 16px;
+    padding-inline: 5px;
+  }
+  .marketcap-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .wallet-button {
+    max-width: 180px;
+    white-space: normal;
+  }
+}
+@media (max-width: 350px) {
+  .header-utilities {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 50px;
+  }
+  .brand {
+    min-height: 50px;
+  }
+}
+
+@media (max-width: 570px) {
+  .wallet-button > svg {
+    display: none;
+  }
+}

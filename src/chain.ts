@@ -7,6 +7,7 @@ import {
   type Hex,
 } from "viem";
 import { publicClient } from "./config";
+import { activeChain, NETWORK, supportedHooks } from "./networks";
 import {
   BASES,
   CONTRACTS,
@@ -26,6 +27,7 @@ export type LaunchPreview = {
 };
 export type TokenInfo = {
   address: Address;
+  hook: Address;
   name: string;
   symbol: string;
   owner: Address;
@@ -50,8 +52,13 @@ export type TokenInfo = {
 export async function readToken(address: Address): Promise<TokenInfo> {
   const block = await publicClient.getBlockNumber({ cacheTime: 0 });
   const code = await publicClient.getCode({ address, blockNumber: block });
-  const expected = `0x363d3d373d3d3d363d73${CONTRACTS.implementation.slice(2)}5af43d82803e903d91602b57fd5bf3${CONTRACTS.hook.slice(2)}`;
-  if (!code?.toLowerCase().startsWith(expected) || code.length !== 292)
+  const cloneHook = `0x${code?.slice(92, 132)}`.toLowerCase() as Address;
+  const expected = `0x363d3d373d3d3d363d73${CONTRACTS.implementation.slice(2)}5af43d82803e903d91602b57fd5bf3${cloneHook.slice(2)}`;
+  if (
+    !code?.toLowerCase().startsWith(expected) ||
+    code.length !== 292 ||
+    !supportedHooks.includes(cloneHook)
+  )
     throw new Error(
       "This address is not an ERC20T clone using the specified implementation and shared hook.",
     );
@@ -88,18 +95,22 @@ export async function readToken(address: Address): Promise<TokenInfo> {
   });
   return {
     address: getAddress(address),
+    hook: cloneHook,
     ...Object.fromEntries(fields.map((field, i) => [field, values[i]])),
     reserve: values[fields.length],
     block,
     checkedAt: Date.now(),
   } as TokenInfo;
 }
-export async function eligibleBase(address: Address): Promise<BaseToken> {
+export async function eligibleBase(
+  address: Address,
+  hook: Address = CONTRACTS.hook,
+): Promise<BaseToken> {
   if (address.toLowerCase() === NATIVE_ETH) return BASES[0];
   const known = BASES.find((b) => b.address === address.toLowerCase());
   const [status, metadata] = await Promise.all([
     publicClient.readContract({
-      address: CONTRACTS.hook,
+      address: hook,
       abi: hookAbi,
       functionName: "externalBases",
       args: [address],
@@ -123,12 +134,13 @@ export async function eligibleBase(address: Address): Promise<BaseToken> {
   } else {
     const token = await readToken(address);
     const initialized = await publicClient.readContract({
-      address: CONTRACTS.hook,
+      address: hook,
       abi: hookAbi,
       functionName: "poolInitialized",
       args: [address],
     });
     if (
+      token.hook.toLowerCase() !== hook.toLowerCase() ||
       !token.launched ||
       !initialized ||
       token.quoteToken.toLowerCase() !== NATIVE_ETH ||
@@ -158,7 +170,7 @@ export async function previewLaunch(
     args: [supply, allocationBps, price, currency0],
   })) as LaunchPreview;
 }
-export async function verifyInfrastructure() {
+export async function verifyInfrastructure(hook: Address = CONTRACTS.hook) {
   const result = await publicClient.multicall({
     contracts: [
       {
@@ -166,7 +178,7 @@ export async function verifyInfrastructure() {
         abi: factoryAbi,
         functionName: "implementation",
       },
-      { address: CONTRACTS.hook, abi: hookAbi, functionName: "poolManager" },
+      { address: hook, abi: hookAbi, functionName: "poolManager" },
       {
         address: CONTRACTS.positionManager,
         abi: tokenAbi,
@@ -186,6 +198,17 @@ export async function verifyInfrastructure() {
     CONTRACTS.poolManager,
     CONTRACTS.permit2,
   ];
+  if (hook.toLowerCase() === CONTRACTS.hook) {
+    const registry = await publicClient.readContract({
+      address: hook,
+      abi: hookAbi,
+      functionName: "globalDistributorRegistry",
+    });
+    if (String(registry).toLowerCase() !== CONTRACTS.globalDistributorRegistry)
+      throw new Error(
+        "The hook’s distributor registry does not match this network’s configuration.",
+      );
+  }
   if (result.some((v, i) => String(v).toLowerCase() !== expected[i]))
     throw new Error(
       "The deployed infrastructure does not match this app’s verified configuration.",
@@ -205,7 +228,7 @@ export async function discoverTokens(
       ).toString()
     : "";
   const res = await fetch(
-    `https://eth.blockscout.com/api/v2/addresses/${CONTRACTS.factory}/logs${query}`,
+    `${NETWORK.indexUrl}/api/v2/addresses/${CONTRACTS.factory}/logs${query}`,
     { signal: AbortSignal.timeout(15000) },
   );
   if (!res.ok)
@@ -228,7 +251,7 @@ export async function discoverTokens(
       if (
         log.eventName === "TokenCreated" &&
         args.token &&
-        args.hook?.toLowerCase() === CONTRACTS.hook
+        supportedHooks.includes(args.hook?.toLowerCase() || "")
       )
         addresses.add(getAddress(args.token));
     } catch {
@@ -240,6 +263,6 @@ export async function discoverTokens(
 export const isTokenAddress = (value: string): value is Address =>
   isAddress(value) && value.toLowerCase() !== NATIVE_ETH;
 export const explorer = (address: string) =>
-  `https://etherscan.io/address/${address}`;
+  `${activeChain.blockExplorers.default.url}/address/${address}`;
 export const shortAddress = (address: string) =>
   `${address.slice(0, 6)}…${address.slice(-4)}`;

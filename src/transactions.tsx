@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useConnection, useWalletClient } from "wagmi";
-import { mainnet } from "viem/chains";
+import { activeChain, NETWORK } from "./networks";
 import {
   type Abi,
   type Address,
@@ -31,7 +31,11 @@ export function useTransaction() {
   const { data: wallet } = useWalletClient();
   const [state, setState] = useState<TxState>({ phase: "idle" });
   const active = useRef(false);
-  async function run(request: TxRequest, preflight?: () => Promise<void>) {
+  async function run(
+    request: TxRequest,
+    preflight?: () => Promise<void>,
+    beforeSigning?: () => void,
+  ) {
     if (active.current) return;
     active.current = true;
     let hash: Hash | undefined;
@@ -39,8 +43,11 @@ export function useTransaction() {
     try {
       if (!connection.address || !wallet)
         throw new Error("Connect a wallet before submitting.");
-      if (connection.chainId !== 1 || (await wallet.getChainId()) !== 1)
-        throw new Error("Switch your wallet to Ethereum mainnet first.");
+      if (
+        connection.chainId !== activeChain.id ||
+        (await wallet.getChainId()) !== activeChain.id
+      )
+        throw new Error(`Switch your wallet to ${activeChain.name} first.`);
       setState({ phase: "simulating" });
       await preflight?.();
       const { request: simulation } = await publicClient.simulateContract({
@@ -53,14 +60,15 @@ export function useTransaction() {
         wallet.getChainId(),
       ]);
       if (
-        chainId !== 1 ||
+        chainId !== activeChain.id ||
         accounts[0]?.toLowerCase() !== connection.address.toLowerCase()
       )
         throw new Error(
           "Your wallet changed. Review the current account and try again.",
         );
+      beforeSigning?.();
       setState({ phase: "signing" });
-      hash = await wallet.writeContract({ ...simulation, chain: mainnet });
+      hash = await wallet.writeContract({ ...simulation, chain: activeChain });
       setState({ phase: "pending", hash });
       const receipt = await publicClient.waitForTransactionReceipt({
         hash,
@@ -122,9 +130,9 @@ export function TransactionStatus({
 }) {
   if (state.phase === "idle") return null;
   const labels = {
-    simulating: "Checking the transaction on Ethereum…",
+    simulating: `Checking the transaction on ${NETWORK.label}…`,
     signing: "Confirm the transaction in your wallet.",
-    pending: "Waiting for Ethereum confirmation…",
+    pending: `Waiting for ${NETWORK.label} confirmation…`,
     success: "Transaction confirmed.",
     error: state.error,
   };
@@ -144,7 +152,7 @@ export function TransactionStatus({
         <div className="transaction-links">
           <a
             className="text-link"
-            href={`https://etherscan.io/tx/${state.hash}`}
+            href={`${activeChain.blockExplorers.default.url}/tx/${state.hash}`}
             target="_blank"
             rel="noreferrer"
           >

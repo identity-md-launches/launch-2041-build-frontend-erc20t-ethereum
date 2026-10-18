@@ -14,7 +14,7 @@ import {
   Settings2,
   ShieldCheck,
 } from "lucide-react";
-import { BASES, CONTRACTS, NATIVE_ETH, tokenAbi } from "./contracts";
+import { BASES, NATIVE_ETH, tokenAbi } from "./contracts";
 import {
   eligibleBase,
   explorer,
@@ -40,6 +40,14 @@ import {
   type TxRequest,
 } from "./transactions";
 import { useOpenWallet } from "./wallet";
+import { activeChain, NETWORK } from "./networks";
+import { StartingPrice, useStartingPrice, dollars } from "./StartingPrice";
+import {
+  assertFreshQuote,
+  initialPriceSettings,
+  impliedMarketCap,
+  type UsdQuote,
+} from "./pricing";
 
 export function TokenPage({ address }: { address: string }) {
   const valid = isTokenAddress(address);
@@ -62,7 +70,7 @@ export function TokenPage({ address }: { address: string }) {
         </Notice>
       ) : query.isPending ? (
         <div className="loading-state">
-          <Busy text="Reading token state from Ethereum…" />
+          <Busy text={`Reading token state from ${NETWORK.label}…`} />
         </div>
       ) : query.data ? (
         <>
@@ -96,7 +104,7 @@ export function TokenPage({ address }: { address: string }) {
             target="_blank"
             rel="noreferrer"
           >
-            Check address on Etherscan
+            Check address on {activeChain.blockExplorers.default.name}
             <ArrowUpRight size={16} />
           </a>
         </div>
@@ -172,7 +180,7 @@ function TokenDetails({
         <AddressValue address={token.address} />
         <p className="chain-read">
           <span className={stale ? "status-dot stale" : "status-dot"} />
-          {stale ? "Last read" : "Read from Ethereum"} · Block{" "}
+          {stale ? "Last read" : `Read from ${NETWORK.label}`} · Block{" "}
           {token.block.toString()}
           <br />
           <span>
@@ -289,7 +297,7 @@ function TokenDetails({
               </dd>
               <dt>Shared hook</dt>
               <dd>
-                <AddressValue address={CONTRACTS.hook} />
+                <AddressValue address={token.hook} />
               </dd>
             </dl>
           </details>
@@ -306,6 +314,7 @@ function TokenDetails({
 }
 type Change = {
   title: string;
+  quote?: UsdQuote;
   description: string;
   request: TxRequest;
   display: string;
@@ -337,11 +346,23 @@ function OwnerControls({
   const [recipientError, setRecipientError] = useState("");
   const [distCheck, setDistCheck] = useState("");
   const [distStatus, setDistStatus] = useState("");
-  const [price, setPrice] = useState("0.00000001");
+  const [priceSettings, setPriceSettings] = useState(initialPriceSettings);
+  const pricing = useStartingPrice(
+    token.totalSupply,
+    {
+      address: token.quoteToken,
+      symbol: base?.symbol || "base",
+      name: base?.symbol || "Base",
+      decimals: base?.decimals ?? 18,
+    },
+    priceSettings,
+    !token.launched && !!base,
+    tab === "launch",
+  );
   const [priceError, setPriceError] = useState("");
   const [preparing, setPreparing] = useState(false);
   const [change, setChange] = useState<Change>();
-  const writable = owner && account.chainId === 1 && !tx.busy;
+  const writable = owner && account.chainId === activeChain.id && !tx.busy;
   function propose(
     title: string,
     description: string,
@@ -359,21 +380,28 @@ function OwnerControls({
   }
   async function confirm() {
     if (!change || !writable) return;
-    const receipt = await tx.run(change.request, async () => {
-      const latest = (await publicClient.readContract({
-        address: token.address,
-        abi: tokenAbi,
-        functionName: "owner",
-      })) as Address;
-      if (latest.toLowerCase() !== account.address?.toLowerCase())
-        throw new Error(
-          "This wallet is no longer the token owner. Refresh the token state.",
-        );
-      if (change.request.functionName === "launch") {
-        await verifyInfrastructure();
-        await eligibleBase(token.quoteToken);
-      }
-    });
+    const receipt = await tx.run(
+      change.request,
+      async () => {
+        if (change.quote) assertFreshQuote(change.quote);
+        const latest = (await publicClient.readContract({
+          address: token.address,
+          abi: tokenAbi,
+          functionName: "owner",
+        })) as Address;
+        if (latest.toLowerCase() !== account.address?.toLowerCase())
+          throw new Error(
+            "This wallet is no longer the token owner. Refresh the token state.",
+          );
+        if (change.request.functionName === "launch") {
+          await verifyInfrastructure(token.hook);
+          await eligibleBase(token.quoteToken, token.hook);
+        }
+      },
+      () => {
+        if (change.quote) assertFreshQuote(change.quote);
+      },
+    );
     if (receipt) {
       refresh();
       client.invalidateQueries({ queryKey: ["factory-tokens"] });
@@ -430,7 +458,7 @@ function OwnerControls({
   async function checkDistributor() {
     setDistStatus("");
     if (!isAddress(distCheck)) {
-      setDistStatus("Enter a valid Ethereum address.");
+      setDistStatus("Enter a valid wallet or contract address.");
       return;
     }
     try {
@@ -464,7 +492,14 @@ function OwnerControls({
     setPriceError("");
     setPreparing(true);
     try {
-      const amount = parseDecimal(price, base.decimals);
+      if (priceSettings.mode === "marketcap") {
+        if (pricing.problem || !pricing.quote.data)
+          throw new Error(
+            pricing.problem || "Wait for the base-token price, then try again.",
+          );
+        assertFreshQuote(pricing.quote.data);
+      }
+      const amount = parseDecimal(pricing.price, base.decimals);
       const p = await previewLaunch(
         token.reserve,
         0,
@@ -474,9 +509,10 @@ function OwnerControls({
       tx.reset();
       setChange({
         title: "Launch the token",
-        description:
-          "This creates the canonical pool and permanently locks the token reserve. No base-token deposit is sent. Ethereum gas is required.",
-        display: `Reserve: ${displayAmount(token.reserve)} ${token.symbol}\nEffective starting price: ${formatUnits(p.effectivePriceWei, base.decimals)} ${base.symbol} per token`,
+        quote:
+          priceSettings.mode === "marketcap" ? pricing.quote.data : undefined,
+        description: `This creates the canonical pool on ${NETWORK.label} and permanently locks the token reserve. No base-token deposit is sent. Gas in ETH is required.`,
+        display: `Reserve: ${displayAmount(token.reserve)} ${token.symbol}\nEffective starting price: ${formatUnits(p.effectivePriceWei, base.decimals)} ${base.symbol} per token${priceSettings.mode === "marketcap" && pricing.quote.data ? `\nTarget market cap: ~${dollars(priceSettings.marketCap)}\nAfter tick alignment: ~${dollars(Number(impliedMarketCap(p.effectivePriceWei, token.totalSupply, pricing.quote.data.usd, base.decimals)))}\n${pricing.quote.data.source}: 1 ${base.symbol} = ${dollars(Number(pricing.quote.data.usd))} (quote must be under 5 minutes old when you sign)` : ""}`,
         request: {
           address: token.address,
           abi: tokenAbi,
@@ -508,9 +544,9 @@ function OwnerControls({
         <Notice>
           This wallet is not the token owner. Settings are read-only.
         </Notice>
-      ) : account.chainId !== 1 ? (
+      ) : account.chainId !== activeChain.id ? (
         <Notice error>
-          Switch your wallet to Ethereum before making changes.
+          Switch your wallet to {NETWORK.label} before making changes.
         </Notice>
       ) : (
         <p className="inline-success">
@@ -538,27 +574,34 @@ function OwnerControls({
         <form onSubmit={prepareLaunch} noValidate className="owner-form">
           <h3>Open your market</h3>
           <p className="muted">
-            The base currency is fixed. Choose a starting price for the reserved
-            tokens.
+            The base currency is fixed. Choose a starting market cap for the
+            full token supply.
           </p>
           <Stat label="Token reserve">
             {displayAmount(token.reserve)} {token.symbol}
           </Stat>
-          <Field
-            id="launch-price"
-            label={`Starting price (${base?.symbol || "base"} per token)`}
+          <StartingPrice
+            id="launch"
+            base={{
+              address: token.quoteToken,
+              symbol: base?.symbol || "base",
+              name: base?.symbol || "Base",
+              decimals: base?.decimals ?? 18,
+            }}
+            settings={priceSettings}
+            onChange={(settings) => {
+              setPriceSettings(settings);
+              setPriceError("");
+            }}
+            price={pricing.price}
+            quote={pricing.quote.data}
+            pending={pricing.quote.isPending}
+            fetching={pricing.quote.isFetching}
+            problem={pricing.problem}
+            refresh={() => pricing.quote.refetch()}
             error={priceError}
-          >
-            <input
-              id="launch-price"
-              inputMode="decimal"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              disabled={!writable || preparing}
-              aria-invalid={!!priceError}
-              aria-describedby={priceError ? "launch-price-hint" : undefined}
-            />
-          </Field>
+            disabled={!writable || preparing}
+          />
           <Notice>
             Launching is irreversible. The initial liquidity position cannot be
             withdrawn.
@@ -781,7 +824,7 @@ function OwnerControls({
       >
         <p className="muted">{change?.description}</p>
         <p className="confirmation-value">{change?.display}</p>
-        <p className="field-hint">Ethereum mainnet · Contract</p>
+        <p className="field-hint">{activeChain.name} · Contract</p>
         <AddressValue address={token.address} />
         <TransactionStatus
           state={tx.state}

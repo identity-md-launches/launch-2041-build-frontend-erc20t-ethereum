@@ -41,6 +41,14 @@ import {
 import { AddressValue, Busy, Field, Notice, Stat } from "./ui";
 import { useOpenWallet } from "./wallet";
 import { TransactionStatus, useTransaction } from "./transactions";
+import { activeChain, NETWORK } from "./networks";
+import {
+  initialPriceSettings,
+  assertFreshQuote,
+  impliedMarketCap,
+  type UsdQuote,
+} from "./pricing";
+import { StartingPrice, useStartingPrice, dollars } from "./StartingPrice";
 
 function TokenArt() {
   return (
@@ -146,9 +154,30 @@ export function TaxChart({ tax, interval }: { tax: number; interval: number }) {
     </div>
   );
 }
-export function Create() {
+export function Create({ active = true }: { active?: boolean }) {
   const [draft, setDraft] = useState<LaunchDraft>(defaultDraft);
   const [step, setStep] = useState(0);
+  const [priceSettings, setPriceSettings] = useState(initialPriceSettings);
+  const [reviewPrice, setReviewPrice] = useState<{
+    price: string;
+    quote?: UsdQuote;
+  }>();
+  let supply = 0n;
+  try {
+    supply = parseDecimal(draft.supply, 18);
+  } catch {
+    /* Inline validation handles invalid supply. */
+  }
+  const pricing = useStartingPrice(
+    supply,
+    draft.base,
+    priceSettings,
+    active && step === 1 && draft.mode === "now",
+    step === 1,
+  );
+  const startingPrice =
+    step === 2 && reviewPrice ? reviewPrice.price : pricing.price;
+  const launchDraft = { ...draft, price: startingPrice };
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [custom, setCustom] = useState(false);
   const [customAddress, setCustomAddress] = useState("");
@@ -165,23 +194,24 @@ export function Create() {
     value: LaunchDraft[K],
   ) => {
     setDraft((d) => ({ ...d, [key]: value }));
+    if (key === "base") setPriceSettings((p) => ({ ...p, manualPrice: "" }));
     setErrors((e) => ({ ...e, [key]: "" }));
     setAccepted(false);
   };
   const valid =
-    !Object.keys(draftErrors(draft, 0)).length &&
-    !Object.keys(draftErrors(draft, 1)).length;
+    !Object.keys(draftErrors(launchDraft, 0)).length &&
+    !Object.keys(draftErrors(launchDraft, 1)).length;
   const preview = useQuery({
     queryKey: [
       "launch-preview",
       draft.supply,
       draft.allocation,
-      draft.price,
+      startingPrice,
       draft.base.address,
     ],
     queryFn: async () => {
       const supply = parseDecimal(draft.supply, 18),
-        price = parseDecimal(draft.price, draft.base.decimals),
+        price = parseDecimal(startingPrice, draft.base.decimals),
         bps = percentBps(draft.allocation);
       const first = await previewLaunch(supply, bps, price, false);
       const second =
@@ -190,14 +220,14 @@ export function Create() {
           : await previewLaunch(supply, bps, price, true);
       return [first, second];
     },
-    enabled: step > 0 && valid && draft.mode === "now",
+    enabled: active && step > 0 && valid && draft.mode === "now",
     retry: 1,
     staleTime: 60000,
   });
   const baseCheck = useQuery({
     queryKey: ["base", draft.base.address],
     queryFn: () => eligibleBase(draft.base.address),
-    enabled: step > 0,
+    enabled: active && step > 0,
     retry: 1,
     staleTime: 30000,
   });
@@ -243,18 +273,47 @@ export function Create() {
   function next(event: FormEvent) {
     event.preventDefault();
     if (step === 1 && custom) {
-      setCustomError(
-        "Check this base’s eligibility, or select ETH, IMD, or FWA.",
-      );
+      setCustomError("Check this base’s eligibility, or choose a listed base.");
       document.getElementById("custom-base")?.focus();
       return;
     }
-    const problems = draftErrors(draft, step);
+    const problems = draftErrors(launchDraft, step);
+    if (
+      step === 1 &&
+      draft.mode === "now" &&
+      priceSettings.mode === "marketcap"
+    ) {
+      if (!startingPrice || pricing.problem)
+        problems.price =
+          pricing.problem ||
+          "Wait for a current base-token price, then review again.";
+      else if (pricing.quote.data) {
+        try {
+          assertFreshQuote(pricing.quote.data);
+        } catch (e) {
+          problems.price = errorMessage(e);
+        }
+      }
+    }
     setErrors(problems);
     if (Object.keys(problems).length) {
-      document.getElementById(Object.keys(problems)[0])?.focus();
+      const first = Object.keys(problems)[0];
+      if (first === "price")
+        (
+          document.getElementById("create-price-price") ||
+          document.querySelector<HTMLInputElement>(
+            'input[name="create-price-cap"]:checked',
+          )
+        )?.focus();
+      else document.getElementById(first)?.focus();
       return;
     }
+    if (step === 1)
+      setReviewPrice({
+        price: startingPrice,
+        quote:
+          priceSettings.mode === "marketcap" ? pricing.quote.data : undefined,
+      });
     setStep((s) => Math.min(2, s + 1));
   }
   async function submit() {
@@ -262,8 +321,17 @@ export function Create() {
       openWallet();
       return;
     }
-    if (!account.address || !accepted || account.chainId !== 1) return;
-    const config = buildConfig(draft, account.address);
+    if (!account.address || !accepted || account.chainId !== activeChain.id)
+      return;
+    if (reviewPrice?.quote) {
+      try {
+        assertFreshQuote(reviewPrice.quote);
+      } catch (e) {
+        setErrors({ price: errorMessage(e) });
+        return;
+      }
+    }
+    const config = buildConfig(launchDraft, account.address);
     await tx.run(
       {
         address: CONTRACTS.factory,
@@ -275,14 +343,18 @@ export function Create() {
             ? [
                 config,
                 percentBps(draft.allocation),
-                parseDecimal(draft.price, draft.base.decimals),
+                parseDecimal(startingPrice, draft.base.decimals),
               ]
             : [config],
         ...(draft.mode === "now" ? { value: 0n } : {}),
       },
       async () => {
+        if (reviewPrice?.quote) assertFreshQuote(reviewPrice.quote);
         await verifyInfrastructure();
         await eligibleBase(draft.base.address);
+      },
+      () => {
+        if (reviewPrice?.quote) assertFreshQuote(reviewPrice.quote);
       },
     );
   }
@@ -310,7 +382,7 @@ export function Create() {
             <br className="mobile-break" /> Its own market
             <span className="accent-period">.</span>
           </h1>
-          <p>Launch on Ethereum with token-only liquidity.</p>
+          <p>Launch on {NETWORK.label} with token-only liquidity.</p>
         </div>
         <a className="text-link learn-link" href="#/how-it-works">
           How it works <ArrowUpRight size={16} />
@@ -349,7 +421,7 @@ export function Create() {
               </h2>
               <p>
                 {draft.mode === "now"
-                  ? "Your token and its permanently locked pool are live on Ethereum."
+                  ? `Your token and its permanently locked pool are live on ${NETWORK.label}.`
                   : "Open the owner console to choose a starting price and launch your pool."}
               </p>
               <AddressValue address={created} />
@@ -377,7 +449,7 @@ export function Create() {
                       [
                         "Make it yours",
                         "Shape your launch",
-                        "Ready for Ethereum",
+                        `Ready for ${NETWORK.label}`,
                       ][step]
                     }
                   </h2>
@@ -586,29 +658,27 @@ export function Create() {
                     </p>
                   )}
                   {draft.mode === "now" ? (
-                    <Field
-                      id="price"
-                      label={`Starting price (${draft.base.symbol} per token)`}
-                      hint="The contract rounds up to a valid pool tick."
+                    <StartingPrice
+                      id="create-price"
+                      base={draft.base}
+                      settings={priceSettings}
+                      onChange={(value) => {
+                        setPriceSettings(value);
+                        setAccepted(false);
+                        setErrors((e) => ({ ...e, price: "" }));
+                      }}
+                      price={pricing.price}
+                      quote={pricing.quote.data}
+                      problem={pricing.problem}
+                      pending={pricing.quote.isPending}
+                      fetching={pricing.quote.isFetching}
+                      refresh={() => pricing.quote.refetch()}
                       error={errors.price}
-                    >
-                      <div className="input-suffix">
-                        <input
-                          id="price"
-                          name="price"
-                          inputMode="decimal"
-                          value={draft.price}
-                          onChange={(e) => update("price", e.target.value)}
-                          aria-invalid={!!errors.price}
-                          aria-describedby="price-hint"
-                        />
-                        <span>{draft.base.symbol}</span>
-                      </div>
-                    </Field>
+                    />
                   ) : (
                     <Notice>
-                      You’ll set the starting price in the owner console when
-                      you launch. The base token is fixed at deployment.
+                      You’ll choose a starting market cap when you launch from
+                      the owner console. The base token is fixed at deployment.
                     </Notice>
                   )}
                   <div className="range-field">
@@ -768,7 +838,9 @@ export function Create() {
                     </span>
                     <div>
                       <h3>{draft.name}</h3>
-                      <span className="muted">{draft.symbol} · Ethereum</span>
+                      <span className="muted">
+                        {draft.symbol} · {NETWORK.label}
+                      </span>
                     </div>
                   </div>
                   <dl className="review-list">
@@ -788,6 +860,21 @@ export function Create() {
                       <dt>Base token</dt>
                       <dd>{draft.base.symbol}</dd>
                     </div>
+                    {draft.mode === "now" &&
+                      priceSettings.mode === "marketcap" && (
+                        <div>
+                          <dt>Target market cap</dt>
+                          <dd>~{dollars(priceSettings.marketCap)}</dd>
+                        </div>
+                      )}
+                    {draft.mode === "now" && (
+                      <div>
+                        <dt>Requested starting price</dt>
+                        <dd>
+                          {startingPrice} {draft.base.symbol}
+                        </dd>
+                      </div>
+                    )}
                     <div>
                       <dt>To creator</dt>
                       <dd>{draft.allocation}%</dd>
@@ -812,6 +899,19 @@ export function Create() {
                   {draft.mode === "now" && (
                     <div className="contract-preview">
                       <strong>Contract price preview</strong>
+                      {reviewPrice?.quote && (
+                        <p className="field-hint">
+                          {reviewPrice.quote.source} · 1 {draft.base.symbol} ={" "}
+                          {dollars(Number(reviewPrice.quote.usd))}. Quote fixed
+                          at{" "}
+                          {new Date(
+                            reviewPrice.quote.fetchedAt,
+                          ).toLocaleTimeString()}
+                          ; quotes must be under 5 minutes old when you sign. Go
+                          back to refresh.
+                        </p>
+                      )}
+                      {errors.price && <Notice error>{errors.price}</Notice>}
                       {preview.isPending ? (
                         <Busy text="Reading the factory preview…" />
                       ) : preview.error ? (
@@ -835,6 +935,25 @@ export function Create() {
                                 : ""}{" "}
                               {draft.base.symbol}
                             </p>
+                            {reviewPrice?.quote && (
+                              <p className="field-hint">
+                                Approximate market cap after tick alignment:{" "}
+                                {dollars(
+                                  Number(
+                                    impliedMarketCap(
+                                      sorted[0],
+                                      supply,
+                                      reviewPrice.quote.usd,
+                                      draft.base.decimals,
+                                    ),
+                                  ),
+                                )}
+                                {sorted[0] !== sorted[1]
+                                  ? ` – ${dollars(Number(impliedMarketCap(sorted[1], supply, reviewPrice.quote.usd, draft.base.decimals)))}`
+                                  : ""}
+                                .
+                              </p>
+                            )}
                             <p className="field-hint">
                               {draft.base.address === NATIVE_ETH
                                 ? "Per whole token, rounded to the pool’s tick spacing."
@@ -884,7 +1003,8 @@ export function Create() {
                     {draft.mode === "now"
                       ? "The initial liquidity position cannot be withdrawn."
                       : "Liquidity is reserved inside the token until the owner launches."}{" "}
-                    You pay Ethereum gas; no base deposit is required.
+                    You pay gas in ETH on {NETWORK.label}; no base deposit is
+                    required.
                   </Notice>
                   <label className="acceptance">
                     <input
@@ -900,11 +1020,13 @@ export function Create() {
                       .
                     </span>
                   </label>
-                  {account.isConnected && account.chainId !== 1 && (
-                    <Notice error>
-                      Switch to Ethereum using the wallet control above.
-                    </Notice>
-                  )}
+                  {account.isConnected &&
+                    account.chainId !== activeChain.id && (
+                      <Notice error>
+                        Switch to {NETWORK.label} using the wallet control
+                        above.
+                      </Notice>
+                    )}
                   {baseCheck.error && (
                     <Notice error>
                       {errorMessage(baseCheck.error)}{" "}
@@ -956,7 +1078,7 @@ export function Create() {
                       baseCheck.isPending ||
                       (draft.mode === "now" && !preview.data) ||
                       (account.isConnected &&
-                        (!accepted || account.chainId !== 1))
+                        (!accepted || account.chainId !== activeChain.id))
                     }
                   >
                     {tx.busy
@@ -996,10 +1118,17 @@ export function Create() {
             <Stat label="Total supply">
               {displayAmount(amounts.creator + amounts.liquidity)}
             </Stat>
+            {draft.mode === "now" && priceSettings.mode === "marketcap" && (
+              <Stat label="Target market cap">
+                ~{dollars(priceSettings.marketCap)}
+              </Stat>
+            )}
             <Stat label="Starting price">
               {draft.mode === "later"
                 ? "Set at launch"
-                : `${draft.price || "0"} ${draft.base.symbol}`}
+                : startingPrice
+                  ? `${startingPrice} ${draft.base.symbol}`
+                  : "Calculated in the launch step"}
             </Stat>
           </div>
           <div className="allocation-preview">

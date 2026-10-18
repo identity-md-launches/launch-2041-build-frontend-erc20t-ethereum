@@ -1,5 +1,6 @@
 import { formatUnits, isAddress, parseUnits, type Address } from "viem";
 import { BASES, CONTRACTS, NATIVE_ETH, type BaseToken } from "./contracts";
+import { NETWORK, supportedHooks } from "./networks";
 export type LaunchDraft = {
   name: string;
   symbol: string;
@@ -62,7 +63,8 @@ export function validRecipient(value: string) {
   return (
     isAddress(value) &&
     value.toLowerCase() !== NATIVE_ETH &&
-    !Object.values(CONTRACTS).some((v) => v === value.toLowerCase())
+    !Object.values(CONTRACTS).some((v) => v === value.toLowerCase()) &&
+    !supportedHooks.includes(value.toLowerCase())
   );
 }
 export function draftErrors(
@@ -145,7 +147,7 @@ export function errorMessage(error: unknown): string {
   if (/rejected|denied/i.test(message))
     return "The wallet request was declined. Your settings are still here; try again when ready.";
   if (/fetch|network|HTTP|timeout|timed out/i.test(message))
-    return "Ethereum could not be reached. Check your connection and try again.";
+    return `${NETWORK.label} or the requested service could not be reached. Check your connection and try again.`;
   return message.length > 350 ? `${message.slice(0, 347)}…` : message;
 }
 

@@ -16,6 +16,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { BASES } from "./contracts";
+import { activeChain, NETWORK } from "./networks";
 import {
   discoverTokens,
   explorer,
@@ -48,7 +49,7 @@ export function TokenCard({ token }: { token: TokenInfo }) {
           target="_blank"
           rel="noreferrer"
           className="icon-button"
-          aria-label={`View ${token.name} on Etherscan`}
+          aria-label={`View ${token.name} on ${activeChain.blockExplorers.default.name}`}
         >
           <ArrowUpRight size={18} />
         </a>
@@ -137,7 +138,7 @@ export function Explore({ mine = false }: { mine?: boolean }) {
     event.preventDefault();
     const value = direct.trim();
     if (!isTokenAddress(value)) {
-      setDirectError("Enter a valid Ethereum token address.");
+      setDirectError(`Enter a valid ${NETWORK.label} token address.`);
       document.getElementById("token-address")?.focus();
       return;
     }
@@ -170,7 +171,7 @@ export function Explore({ mine = false }: { mine?: boolean }) {
           >
             <input
               id="token-address"
-              placeholder="Ethereum token address (0x…)"
+              placeholder={`${NETWORK.label} token address (0x…)`}
               value={direct}
               onChange={(e) => {
                 setDirect(e.target.value);
@@ -290,7 +291,9 @@ export function Explore({ mine = false }: { mine?: boolean }) {
                   </button>
                 </Notice>
               )}
-              {loading && <Busy text="Reading token details from Ethereum…" />}
+              {loading && (
+                <Busy text={`Reading token details from ${NETWORK.label}…`} />
+              )}
               {filtered.length > 0 ? (
                 <div className="token-grid">
                   {filtered.map((t) => (
@@ -333,7 +336,7 @@ export function Explore({ mine = false }: { mine?: boolean }) {
               <div className="discovery-footer">
                 <p className="field-hint">
                   {filtered.length} of {all.length} loaded tokens · Indexed by
-                  Blockscout, verified against Ethereum.
+                  Blockscout, verified against {NETWORK.label}.
                   <br />
                   Tax reads refresh every 30 seconds. Open a token for its
                   latest block.

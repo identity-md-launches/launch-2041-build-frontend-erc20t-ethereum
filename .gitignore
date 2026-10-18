@@ -13,3 +13,4 @@
 *.tsbuildinfo
 /test/scratch/
 /.playwright-mcp/
+!/artifacts/

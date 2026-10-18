@@ -2,7 +2,7 @@
 
 ## Overview
 
-ERC20T is a working launch console for token creators and owners. The interface combines warm off-white surfaces, dark olive text, and a burnt-orange primary action. A code-drawn token carrying the six-spoke brand mark is the one illustrative idea; it appears in the configuration preview and share image.
+ERC20T is a working Ethereum and Robinhood Chain launch console for token creators and owners. The interface combines warm off-white surfaces, dark olive text, and a burnt-orange primary action. A code-drawn token carrying the six-spoke brand mark is the one illustrative idea; it appears in the configuration preview and share image.
 
 The main task comes before explanation. The create page puts a three-step form beside a live configuration summary on desktop. On a phone the form comes first. Discovery uses factual token cards; the owner page uses clearly separated market information and settings. There are no fabricated market charts, gradients, decorative animations, or marketing sections before the form.
 
@@ -59,12 +59,12 @@ The spacing tokens are 4, 8, 12, 16, 24, 32, and 48 px. Components also use 10/1
 
 Responsive rules, all in `src/styles.css`:
 
-- **≤1080 px:** header/main insets reduce to 32 px; the network label is removed while the wallet control remains; form padding is 24 px; discovery becomes two columns.
+- **≤1080 px:** header/main insets reduce to 32 px; utility gap reduces to 10 px; the network selector and wallet remain visible; form padding is 24 px; discovery becomes two columns.
 - **≤780 px:** create and detail workspaces stack. The preview briefly uses an internal two-column arrangement to use tablet width. Display type becomes 32 px. Insets are 24 px.
-- **≤570 px:** logo/wallet share the top row, navigation gets its own row, and main content is inset 16 px. The preview becomes a simple vertical summary. The form uses 18 px side padding. Discovery is one column; filters and address lookup wrap. The wallet dialog is a bottom sheet with safe-area padding. Feature explanations stack after the product.
-- **≤350 px:** insets/padding reduce slightly, the nonessential section icon is omitted, and base choices wrap to two columns. Controls and meaningful text remain present.
+- **≤570 px:** logo, network and wallet share the top row; navigation gets its own row; main content is inset 16 px. The native network select is 120 px wide with 16 px text and 44 px minimum height. The decorative wallet icon is hidden so the network name and connected address fit. Market-cap choices form a two-column grid. The preview becomes a simple vertical summary. The form uses 18 px side padding. Discovery is one column; filters and address lookup wrap. The wallet dialog is a bottom sheet with safe-area padding. Feature explanations stack after the product.
+- **≤350 px:** network/wallet utilities get their own full-width row, insets/padding reduce slightly, the nonessential section icon is omitted, and base choices wrap to two columns. Controls and meaningful text remain present.
 
-The create page and token detail were checked at **320, 390, 780, and 1440 px**, with rendered mobile/desktop screenshots. At 390×844 the first-screen action ends at 814.66 px. The pinned probe found no horizontal scroll, text overlap, clipped text, or floating-control collisions at its three widths. Native 200% zoom and a translated/RTL layout were not verified; the delivered interface is English.
+Responsive entry states were checked at **320, 390, 780, and 1440 px**, with additional token-detail, owner and wallet states in the browser suite. At 390×844 the first-screen action ends at 814.66 px on both networks. The pinned probe passed 16/16 checks for each network, with no horizontal scroll, text overlap, clipped text, or floating-control collisions at its three widths. See `artifacts/launch-mobile.png`, `artifacts/robinhood-mobile.png` and `artifacts/launch-desktop.png`. Native 200% zoom and a translated/RTL layout were not verified; the delivered interface is English.
 
 ## Elevation & Depth
 
@@ -87,11 +87,15 @@ Fields/buttons use **8 px** radius; desktop panels use **16 px**; mobile panels 
 | `Modal` · `src/ui.tsx` | Native dialog with labelled heading, X, Escape/backdrop dismissal, explicit Tab wrap, and native focus return. `dismissible=false` keeps a submitted owner action visible while processing. |
 | `AddressValue` · `src/ui.tsx` | Full checksummed, wrapping address; optional explorer link; copy control with success or manual-copy fallback. |
 | `Stat` · `src/ui.tsx` | Label/value row, wrapping values, tabular numbers. |
+| Network selector · `src/App.tsx` | Labelled native select, 126 px wide on desktop and 120 px on phones. Both chains remain accessible at every breakpoint. Changing it reloads the selected network and clears unsigned drafts/reviews; an existing token-detail route changes to Explore. |
+| `StartingPrice`, `useStartingPrice` · `src/StartingPrice.tsx` | Shared atomic/deferred-launch pricing. Native fieldset/legend and radios for ~$50k, ~$150k, ~$500k and ~$1m; four columns on desktop, two on phones. Options are at least 48 px high, with selected border/background, native checked state and a visible focus-within outline. Tab enters the group; arrow keys select/recalculate. |
 | `Create`, `TaxChart` · `src/Create.tsx` | Three-step wizard, native launch-mode radios, base choices, allocation/tax ranges, launch-decay switch, optional recipients, final review and acknowledgement. Chart is a configuration illustration with accessible text, not a market-price chart. |
 | `WalletProvider`, `ConnectControl` · `src/wallet.tsx` | One persistent header control. EIP-6963 names/icons; real local wallet marks; mobile deep links; Coinbase Smart Wallet; row pending state; rejection recovery; full account/disconnect dialog. |
 | `TokenCard`, `Explore` · `src/Explore.tsx` | Live-read token cards, status text, search, filters, loading/error/empty states and pagination. No card has fabricated performance data. |
 | `TokenPage`, `OwnerControls` · `src/Token.tsx` | Latest chain tax, block/time provenance, fee split, complete contract details, owner-only inputs and review-before-sign dialogs. Nonowners can inspect; permissions cannot be written. |
 | `TransactionStatus` · `src/transactions.tsx` | Simulation, signing, pending, confirmation, error, explorer, and receipt-recheck states. An in-flight guard and submitted hashes prevent accidental duplicate requests. Confirmed reverts/cancellations offer “Clear failed attempt”; unresolved receipts offer “Check confirmation”. |
+
+The pricing block has labelled loading, source/time, refresh, recoverable quote-error, manual-input and expired-review states. Calculated prices and review values wrap in full using `overflow-wrap: anywhere`; changing numbers use tabular figures. The quote is announced politely, and errors use the existing alert treatment. "Enter a manual price" explicitly changes mode and reveals a labelled 16 px decimal input. The review freezes the chosen quote and shows tick alignment and approximate valuation. Targets describe total supply including creator allocation, and the explanation states that valuation is not funds raised. `src/pricing.ts` owns the math/data rules, independently of visual controls.
 
 Lucide is the interface icon set, rendered using current text color. Decorative SVGs are hidden from accessibility; action icons have visible labels or explicit accessible names.
 
@@ -104,6 +108,8 @@ Motion is only enabled under `prefers-reduced-motion: no-preference`. Button col
 - Reuse semantic color/type tokens. Keep addresses and numbers selectable, wrapping, and fully available.
 - State exactly which block or loaded page a figure represents. Never use decorative market charts or sample tokens as live data.
 - Keep field guidance close to its control. Explain permanent liquidity locking and gas before a wallet signature.
+- Reuse `StartingPrice` for launch valuation. Keep source/time, quote failure recovery and the manual mode; do not present a target as guaranteed market value.
+- Keep the network selector visible with the persistent wallet control. Do not reuse another chain's token or contract address.
 - Preserve native dialog semantics, explicit keyboard wrap, and focus return when modifying wallet/review flows.
 - Do not add nested card surfaces, extra font families, tracked capital labels, root-relative assets, or a breakpoint that hides the primary action.
 
