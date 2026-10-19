@@ -37,6 +37,7 @@ export const NETWORKS = {
     rpcUrls: ["https://ethereum-rpc.publicnode.com", "https://eth.drpc.org"],
     indexUrl: "https://eth.blockscout.com",
     dexChain: "ethereum",
+    chartNetwork: "eth",
     contracts: {
       factory: "0x801411c6acec4fa80c75c5d3c0eae13c84f8a173",
       hook: "0x05e1934d8b52a8ded4f3f42aa9a7a12244192544",
@@ -45,6 +46,9 @@ export const NETWORKS = {
       poolManager: "0x000000000004444c5dc75cb358380d2e3de08a90",
       positionManager: "0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e",
       permit2,
+      // Universal Router 2.1.2 and V4Quoter from Uniswap's v4 deployment list.
+      universalRouter: "0x23617e59a5925b2a4bf75d73ff6711cd0b29de85",
+      quoter: "0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203",
     },
     legacyHooks: ["0xed9a04fa6693e754661a22502524df9b1857e544"],
     bases: [
@@ -72,6 +76,7 @@ export const NETWORKS = {
     ],
     indexUrl: "https://robinhoodchain.blockscout.com",
     dexChain: "robinhood",
+    chartNetwork: "robinhood",
     contracts: {
       factory: "0x04c8ba34cb3fd5af9db06b8a25eaf1c8fb1ce738",
       hook: "0x6e582dcdbb21902080124fc677db1ed8c1596544",
@@ -80,6 +85,8 @@ export const NETWORKS = {
       poolManager: "0x8366a39cc670b4001a1121b8f6a443a643e40951",
       positionManager: "0x58daec3116aae6d93017baaea7749052e8a04fa7",
       permit2,
+      universalRouter: "0x204faca1764b154221e35c0d20abb3c525710498",
+      quoter: "0x8dc178efb8111bb0973dd9d722ebeff267c98f94",
     },
     legacyHooks: [],
     // This IMD address is registered and enabled in Robinhood's hook. FWA has

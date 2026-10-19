@@ -42,6 +42,9 @@ import {
 import { useOpenWallet } from "./wallet";
 import { activeChain, NETWORK } from "./networks";
 import { StartingPrice, useStartingPrice, dollars } from "./StartingPrice";
+import { SwapPanel } from "./Swap";
+import { PriceChart } from "./Chart";
+import { poolId, readPools } from "./swap";
 import {
   assertFreshQuote,
   initialPriceSettings,
@@ -148,6 +151,14 @@ function TokenDetails({
     staleTime: Infinity,
   });
   const base = knownBase || baseMetadata.data;
+  const pools = useQuery({
+    queryKey: ["pools", token.address, token.quoteToken, token.hook],
+    queryFn: () => readPools(token.address, token.quoteToken, token.hook),
+    enabled: token.launched,
+    staleTime: Infinity,
+    retry: 2,
+  });
+  const tokenAsset = { address: token.address, symbol: token.symbol, decimals: 18 };
   return (
     <>
       <div className="page-heading token-page-heading">
@@ -193,6 +204,33 @@ function TokenDetails({
           </span>
         </p>
       </div>
+      <div className="trade-grid">
+        {base ? (
+          <SwapPanel
+            token={tokenAsset}
+            base={{ address: token.quoteToken, symbol: base.symbol, decimals: base.decimals }}
+            pools={pools.data}
+            taxBps={token.taxBps}
+          />
+        ) : (
+          <section className="swap-panel">
+            <Busy text="Reading base token…" />
+          </section>
+        )}
+        <PriceChart
+          pool={pools.data ? poolId(pools.data.tokenPool) : undefined}
+          token={token.address}
+          symbol={token.symbol}
+        />
+      </div>
+      {pools.isError && (
+        <Notice error>
+          The pool route could not be read. {errorMessage(pools.error)}{" "}
+          <button className="inline-button" onClick={() => pools.refetch()}>
+            Retry
+          </button>
+        </Notice>
+      )}
       <div className="detail-grid">
         <div className="market-panel">
           <div className="panel-heading">
